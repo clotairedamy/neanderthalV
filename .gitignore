@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtualenv (recreated by ./setup.sh)
+venv/
+.venv/
+
+# Build output
+build/
+dist/
+*.spec.bak
+
+# Local config / caches (live in the OS config & cache dirs, not here)
+config.ini
+presets.ini
+
+# OS
+.DS_Store

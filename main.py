@@ -19,8 +19,8 @@ def main() -> int:
     vispy.use(app="pyqt6")
 
     app = QApplication(sys.argv)
-    app.setApplicationName("GeoViz")
-    app.setOrganizationName("GeoViz")
+    app.setApplicationName("NeanderthalV")
+    app.setOrganizationName("NeanderthalV")
 
     from visualizer.config import Settings
     from visualizer.ui.main_window import MainWindow

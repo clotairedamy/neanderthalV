@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch GeoViz (macOS and Raspberry Pi 5).
+# Launch NeanderthalV (macOS and Raspberry Pi 5).
 set -euo pipefail
 cd "$(dirname "$0")"
 

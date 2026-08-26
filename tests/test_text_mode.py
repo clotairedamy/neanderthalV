@@ -4,7 +4,7 @@ from visualizer.viz.mode_text import text_points
 
 
 def test_text_points_shape_and_range():
-    pts, u = text_points("GEOVIZ")
+    pts, u = text_points("NEANDERTHALV")
     assert len(pts) > 500
     assert pts.shape[1] == 2
     assert len(u) == len(pts)

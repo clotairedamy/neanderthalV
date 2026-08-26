@@ -1,5 +1,5 @@
-# PyInstaller spec — builds GeoViz.app for macOS.
-# Usage: pyinstaller packaging/geoviz.spec  (run from the project root)
+# PyInstaller spec — builds NeanderthalV.app for macOS.
+# Usage: pyinstaller packaging/neanderthalv.spec  (run from the project root)
 import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -29,18 +29,18 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts,
     exclude_binaries=True,
-    name="GeoViz",
+    name="NeanderthalV",
     console=False,
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="GeoViz")
+coll = COLLECT(exe, a.binaries, a.datas, name="NeanderthalV")
 app = BUNDLE(
     coll,
-    name="GeoViz.app",
-    icon="GeoViz.icns",
-    bundle_identifier="com.geoviz.app",
+    name="NeanderthalV.app",
+    icon="NeanderthalV.icns",
+    bundle_identifier="com.neanderthalv.app",
     info_plist={
         "NSMicrophoneUsageDescription":
-            "GeoViz analyzes live microphone audio to drive visualizations.",
+            "NeanderthalV analyzes live microphone audio to drive visualizations.",
         "NSHighResolutionCapable": True,
     },
 )

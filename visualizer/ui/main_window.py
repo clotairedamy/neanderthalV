@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self.profile = active_profile()
-        self.setWindowTitle("GeoViz — Audio-Reactive 3D Visualizer")
+        self.setWindowTitle("NeanderthalV — Audio-Reactive 3D Visualizer")
         self.resize(1280, 800)
         self.setAcceptDrops(True)
 
@@ -502,7 +502,7 @@ class MainWindow(QMainWindow):
             lambda: self.info_bar.status.setText("Stems ready ✓"))
         self.engine.playback_finished.connect(self._on_playback_finished)
         self.engine.error.connect(
-            lambda msg: QMessageBox.warning(self, "GeoViz", msg))
+            lambda msg: QMessageBox.warning(self, "NeanderthalV", msg))
 
     def _install_shortcuts(self):
         def sc(key, fn):
@@ -607,7 +607,7 @@ class MainWindow(QMainWindow):
             else:
                 self.info_bar.status.setText(f"Unsupported file type: {ext}")
         except Exception as e:
-            QMessageBox.warning(self, "GeoViz", f"Failed to load {path}:\n{e}")
+            QMessageBox.warning(self, "NeanderthalV", f"Failed to load {path}:\n{e}")
 
     def _load_audio(self, path: str):
         self.mic_btn.setChecked(False)
@@ -735,7 +735,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self, "Webcam",
                     f"Could not open the webcam:\n{e}\n\nOn macOS, camera "
-                    "access must be granted to the app running GeoViz "
+                    "access must be granted to the app running NeanderthalV "
                     "(System Settings ▸ Privacy & Security ▸ Camera).")
         else:
             self.viz.set_camera(None)
@@ -849,7 +849,7 @@ class MainWindow(QMainWindow):
         tag = {"screen": "", "reel": "_reel", "square": "_square"}.get(fmt, "")
         path = os.path.join(
             self._export_dir(),
-            f"geoviz_{time.strftime('%Y%m%d_%H%M%S')}{tag}_60fps.mp4")
+            f"neanderthalv_{time.strftime('%Y%m%d_%H%M%S')}{tag}_60fps.mp4")
         was_playing = self.engine.playing
         self.engine.pause()
         self.analysis_timer.stop()
@@ -895,7 +895,7 @@ class MainWindow(QMainWindow):
 
     def _screenshot(self):
         path = os.path.join(self._export_dir(),
-                            f"geoviz_{time.strftime('%Y%m%d_%H%M%S')}.png")
+                            f"neanderthalv_{time.strftime('%Y%m%d_%H%M%S')}.png")
         try:
             self.viz.screenshot(path)
             self.info_bar.status.setText(f"Saved {path}")
@@ -915,7 +915,7 @@ class MainWindow(QMainWindow):
             tag = {"screen": "", "reel": "_reel", "square": "_square"}.get(fmt, "")
             path = os.path.join(
                 self._export_dir(),
-                f"geoviz_{time.strftime('%Y%m%d_%H%M%S')}{tag}.mp4")
+                f"neanderthalv_{time.strftime('%Y%m%d_%H%M%S')}{tag}.mp4")
             self.info_bar.status.setText("Encoding 60fps video…")
             out = self.viz.stop_recording(
                 path, audio=self.engine.audio, sr=self.engine.sr,

@@ -27,5 +27,5 @@ def test_song():
 def settings():
     from visualizer.config import Settings
     s = Settings()          # defaults, no disk I/O
-    s._path = "/tmp/geoviz_test_config.ini"
+    s._path = "/tmp/neanderthalv_test_config.ini"
     return s

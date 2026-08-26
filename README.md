@@ -1,4 +1,4 @@
-# GeoViz — Audio-Reactive 3D Geometric Visualizer
+# NeanderthalV — Audio-Reactive 3D Geometric Visualizer
 
 Cross-platform desktop app (macOS & Raspberry Pi 5) that turns audio files,
 live microphone input, or video soundtracks into ten velocity-driven 3D
@@ -16,7 +16,7 @@ performance profile (60 fps / 2500 particles on macOS, 30 fps / 800 particles
 on the Pi). The whole folder is the deployment: copy it to either machine and
 run the two scripts.
 
-**macOS single-app build:** `./packaging/build_macos.sh` → `dist/GeoViz.app`
+**macOS single-app build:** `./packaging/build_macos.sh` → `dist/NeanderthalV.app`
 (with app icon). Note: the bundle is unsigned — to distribute it beyond your
 own machine you'll need to sign & notarize with your Apple Developer ID
 (`codesign` + `notarytool`); on your own Mac, right-click → Open bypasses
@@ -129,7 +129,7 @@ Modes 7–8 are intentionally grayscale (additive glow on black); a matching
 
 The original three.js demo plays one fixed grayscale Kinect clip. This one:
 
-| | three.js original | GeoViz |
+| | three.js original | NeanderthalV |
 | --- | --- | --- |
 | Source | the bundled depth clip | that same clip (bundled, looping — the default), plus any video, a photo, the live webcam, or the music itself |
 | Depth | luminance | luminance, or true **RGBD** side-by-side / top-bottom footage |
@@ -157,7 +157,7 @@ your own video or photo and *Auto* switches to it.
 
 Controls live in the *Depth Point Cloud* panel: source, depth layout,
 near/far clipping, point size, cutoff, perspective and band colors. The webcam source is
-optional — it needs camera permission for the app running GeoViz (macOS:
+optional — it needs camera permission for the app running NeanderthalV (macOS:
 System Settings ▸ Privacy & Security ▸ Camera).
 
 ## Keyboard shortcuts
@@ -217,9 +217,9 @@ All exports go to a folder you choose (Export ▸ Folder…, default Desktop):
 Smoothing, sensitivity, velocity damping, beat impulse, FFT range, blend mode,
 palette (Viridis / Plasma / Turbo / Neon / Mono / Custom / Image), auto-camera, and
 velocity debug are all in the left panel and persist to `config.ini`
-(`~/Library/Application Support/GeoViz` on macOS, `~/.config/geoviz` on the Pi).
-Stem caches live under the platform cache dir (`~/Library/Caches/GeoViz` /
-`~/.cache/geoviz`).
+(`~/Library/Application Support/NeanderthalV` on macOS, `~/.config/neanderthalv` on the Pi).
+Stem caches live under the platform cache dir (`~/Library/Caches/NeanderthalV` /
+`~/.cache/neanderthalv`).
 
 ## Project layout
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for GeoViz on macOS or Raspberry Pi 5.
+# One-time setup for NeanderthalV on macOS or Raspberry Pi 5.
 # Creates a venv, installs dependencies, optionally installs Demucs and
 # pre-downloads the htdemucs model.
 set -euo pipefail

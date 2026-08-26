@@ -24,10 +24,10 @@ def is_macos() -> bool:
 
 def config_dir() -> str:
     if is_macos():
-        d = os.path.expanduser("~/Library/Application Support/GeoViz")
+        d = os.path.expanduser("~/Library/Application Support/NeanderthalV")
     else:
         d = os.path.join(os.environ.get("XDG_CONFIG_HOME",
-                                        os.path.expanduser("~/.config")), "geoviz")
+                                        os.path.expanduser("~/.config")), "neanderthalv")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -43,10 +43,10 @@ def asset_path(name: str) -> str:
 
 def cache_dir() -> str:
     if is_macos():
-        d = os.path.expanduser("~/Library/Caches/GeoViz")
+        d = os.path.expanduser("~/Library/Caches/NeanderthalV")
     else:
         d = os.path.join(os.environ.get("XDG_CACHE_HOME",
-                                        os.path.expanduser("~/.cache")), "geoviz")
+                                        os.path.expanduser("~/.cache")), "neanderthalv")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -105,7 +105,7 @@ class Settings:
     pc_band_axis: str = "off"     # off|vertical|depth|horizontal|radial
     pc_band_push: float = 0.10    # how far each band's energy displaces its zone
     # reactive 3D text (mode 10)
-    text_content: str = "GEOVIZ"
+    text_content: str = "NEANDERTHALV"
     text_depth: float = 0.55      # per-band forward push
     text_explode: float = 1.0     # beat scatter strength
     pc_cutoff: float = 0.08
@@ -128,8 +128,8 @@ class Settings:
         s = cls()
         s._path = os.path.join(config_dir(), "config.ini")
         cp = configparser.ConfigParser()
-        if cp.read(s._path) and cp.has_section("geoviz"):
-            sec = cp["geoviz"]
+        if cp.read(s._path) and cp.has_section("neanderthalv"):
+            sec = cp["neanderthalv"]
             for f in fields(cls):
                 if f.name.startswith("_") or f.name not in sec:
                     continue
@@ -149,7 +149,7 @@ class Settings:
 
     def save(self) -> None:
         cp = configparser.ConfigParser()
-        cp["geoviz"] = {
+        cp["neanderthalv"] = {
             f.name: str(getattr(self, f.name))
             for f in fields(self) if not f.name.startswith("_")
         }

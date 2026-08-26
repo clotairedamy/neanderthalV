@@ -52,7 +52,7 @@ def text_points(text: str, max_points: int = 12000,
     """
     from PIL import Image, ImageDraw
 
-    text = (text or "GEOVIZ").strip() or "GEOVIZ"
+    text = (text or "NEANDERTHALV").strip() or "NEANDERTHALV"
     font = load_font(px)
     tmp = Image.new("L", (8, 8))
     d = ImageDraw.Draw(tmp)
