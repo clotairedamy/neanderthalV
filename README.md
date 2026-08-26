@@ -26,6 +26,15 @@ Gatekeeper.
 (36 tests covering analysis, beat grid, anticipation, stems, SP-1 export,
 physics, geometry, palettes, presets, point-cloud and text geometry).
 
+## Interface
+
+A dark, tabbed control panel — **Source** (files, mic, playlist, video),
+**Mix** (stem faders), **Visuals** (mode + palette, with only the active
+mode's own settings shown), **Motion** (analysis & physics), **FX** (bloom,
+trails, anticipation, grain) and **Export** — with presets pinned above and
+a media-player transport bar (play, scrub, speed, loop, pitch) under the
+canvas.
+
 ## Features
 
 - **Inputs**: MP3 / WAV / FLAC / OGG audio, live microphone, and MP4 / MOV /
@@ -115,7 +124,10 @@ physics, geometry, palettes, presets, point-cloud and text geometry).
    well past the original — see below.
 
 10. **Reactive 3D Text** — your own words rasterized into a 3D point cloud
-   and extruded into layers. The word doubles as a spectrum analyzer: a
+   and extruded into 7 depth layers with front-to-back shading. Long words
+   wrap to two lines so the letters stay large, and the word *sways* within
+   a bounded angle rather than spinning freely — a continuously rotating
+   word is edge-on and unreadable half the time. The word doubles as a spectrum analyzer: a
    point's horizontal position picks its frequency band, so the left of the
    word answers the bass and the right the highs — each zone in its own
    color and pushed toward the viewer by that band. Kicks blow the letters

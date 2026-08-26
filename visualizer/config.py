@@ -106,8 +106,9 @@ class Settings:
     pc_band_push: float = 0.10    # how far each band's energy displaces its zone
     # reactive 3D text (mode 10)
     text_content: str = "NEANDERTHALV"
-    text_depth: float = 0.55      # per-band forward push
-    text_explode: float = 1.0     # beat scatter strength
+    text_depth: float = 0.38      # per-band forward push
+    text_sway: float = 0.45       # max yaw in radians (~26 deg)
+    text_explode: float = 0.7     # beat scatter strength
     pc_cutoff: float = 0.08
     bloom: bool = True              # GPU glow post-processing
     trails: bool = True             # feedback echo trails

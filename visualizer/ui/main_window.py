@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QMainWindow,
     QMessageBox, QProgressDialog, QPushButton, QRadioButton, QScrollArea,
-    QSlider, QSplitter, QVBoxLayout, QWidget)
+    QSlider, QSplitter, QTabWidget, QVBoxLayout, QWidget)
 
 from ..audio.analyzer import STEMS, AnalysisFrame
 from ..audio.engine import AUDIO_EXTS, AudioEngine, extract_audio_from_video
@@ -58,14 +58,41 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ UI
 
+    @staticmethod
+    def _scroll_tab():
+        """A tab page that scrolls, returning (page widget, its layout)."""
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setSpacing(10)
+        lay.setContentsMargins(10, 12, 10, 10)
+        area = QScrollArea()
+        area.setWidget(page)
+        area.setWidgetResizable(True)
+        return area, lay
+
     def _build_ui(self):
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.setCentralWidget(splitter)
 
-        # left: controls in a scroll area
-        panel = QWidget()
-        panel_l = QVBoxLayout(panel)
-        panel_l.setSpacing(8)
+        # left: a header (presets) above tabbed control pages
+        left = QWidget()
+        left_l = QVBoxLayout(left)
+        left_l.setContentsMargins(10, 10, 10, 0)
+        left_l.setSpacing(8)
+        header_l = QVBoxLayout()
+        left_l.addLayout(header_l)
+
+        self.tabs = QTabWidget()
+        self.tabs.setUsesScrollButtons(False)
+        self.tabs.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
+        self.tabs.tabBar().setExpanding(False)
+        left_l.addWidget(self.tabs, stretch=1)
+        src_tab, src_l = self._scroll_tab()
+        mix_tab, mix_l = self._scroll_tab()
+        vis_tab, vis_l = self._scroll_tab()
+        mot_tab, mot_l = self._scroll_tab()
+        fx_tab, fx_l = self._scroll_tab()
+        exp_tab, exp_l = self._scroll_tab()
 
         # -- files
         files_box = QGroupBox("Files  (or drag && drop anywhere)")
@@ -92,50 +119,50 @@ class MainWindow(QMainWindow):
         self.queue_list.itemDoubleClicked.connect(self._play_queued)
         self.queue_list.hide()
         fl.addWidget(self.queue_list)
-        panel_l.addWidget(files_box)
+        src_l.addWidget(files_box)
 
-        # -- playback
-        play_box = QGroupBox("Playback")
-        pl = QVBoxLayout(play_box)
-        row = QHBoxLayout()
-        self.play_btn = QPushButton("▶ Play")
+        # -- transport bar (built here, mounted under the canvas)
+        self.transport = QWidget()
+        self.transport.setObjectName("transport")
+        tr = QHBoxLayout(self.transport)
+        tr.setContentsMargins(12, 8, 12, 8)
+        tr.setSpacing(10)
+        self.play_btn = QPushButton("▶")
+        self.play_btn.setFixedWidth(44)
+        self.play_btn.setToolTip("Play / pause  (Space)")
         self.play_btn.clicked.connect(self._toggle_play)
-        row.addWidget(self.play_btn)
+        tr.addWidget(self.play_btn)
         self.time_label = QLabel("0:00 / 0:00")
-        row.addWidget(self.time_label)
-        pl.addLayout(row)
+        self.time_label.setStyleSheet("font-family: Menlo, monospace;")
+        tr.addWidget(self.time_label)
         self.seek_slider = QSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setRange(0, 1000)
         self.seek_slider.sliderPressed.connect(lambda: setattr(self, "_seeking", True))
         self.seek_slider.sliderReleased.connect(self._seek_released)
-        pl.addWidget(self.seek_slider)
-        srow = QHBoxLayout()
-        srow.addWidget(QLabel("Speed"))
+        tr.addWidget(self.seek_slider, stretch=1)
+        tr.addWidget(QLabel("Speed"))
         self.speed_slider = QSlider(Qt.Orientation.Horizontal)
         self.speed_slider.setRange(50, 200)
         self.speed_slider.setValue(100)
+        self.speed_slider.setFixedWidth(110)
         self.speed_slider.valueChanged.connect(
             lambda v: (self.engine.set_speed(v / 100),
                        self.speed_label.setText(f"{v / 100:.2f}x")))
         self.speed_label = QLabel("1.00x")
+        self.speed_label.setStyleSheet("font-family: Menlo, monospace;")
         self.speed_slider.sliderReleased.connect(self.engine.apply_pitch_speed)
-        srow.addWidget(self.speed_slider)
-        srow.addWidget(self.speed_label)
-        pl.addLayout(srow)
-        prow0 = QHBoxLayout()
-        self.pitch_check = QCheckBox("Preserve pitch")
+        tr.addWidget(self.speed_slider)
+        tr.addWidget(self.speed_label)
+        self.pitch_check = QCheckBox("Pitch")
         self.pitch_check.setChecked(self.settings.preserve_pitch)
-        self.pitch_check.setToolTip("Phase-vocoder stretch (rendered in the "
-                                    "background) instead of turntable-style "
-                                    "varispeed")
+        self.pitch_check.setToolTip("Preserve pitch: phase-vocoder stretch "
+                                    "instead of turntable-style varispeed")
         self.pitch_check.toggled.connect(self._toggle_pitch)
         self.loop_check = QCheckBox("Loop")
         self.loop_check.toggled.connect(
             lambda on: setattr(self.engine, "loop", on))
-        prow0.addWidget(self.pitch_check)
-        prow0.addWidget(self.loop_check)
-        pl.addLayout(prow0)
-        panel_l.addWidget(play_box)
+        tr.addWidget(self.pitch_check)
+        tr.addWidget(self.loop_check)
 
         # -- presets
         preset_box = QGroupBox("Presets")
@@ -146,20 +173,21 @@ class MainWindow(QMainWindow):
         b_psave = QPushButton("Save…")
         b_psave.clicked.connect(self._save_preset)
         b_pdel = QPushButton("✕")
-        b_pdel.setFixedWidth(28)
+        b_pdel.setFixedWidth(34)
+        b_pdel.setStyleSheet("padding: 6px 0;")
         b_pdel.setToolTip("Delete selected preset")
         b_pdel.clicked.connect(self._delete_preset)
         prl.addWidget(self.preset_combo, stretch=1)
         prl.addWidget(b_psave)
         prl.addWidget(b_pdel)
-        panel_l.addWidget(preset_box)
+        header_l.addWidget(preset_box)
 
         # -- stem mixer
         self.mixer = StemMixer()
         self.mixer.gain_changed.connect(self.engine.set_stem_gain)
         self.mixer.mute_changed.connect(self.engine.set_stem_mute)
         self.mixer.solo_changed.connect(self.engine.set_solo)
-        panel_l.addWidget(self.mixer)
+        mix_l.addWidget(self.mixer)
 
         # -- visualization modes
         mode_box = QGroupBox(f"Visualization  (keys 1–{len(MODE_CLASSES)})")
@@ -178,7 +206,7 @@ class MainWindow(QMainWindow):
         self.choreo_check.toggled.connect(
             lambda on: setattr(self.settings, "auto_choreograph", on))
         ml.addWidget(self.choreo_check)
-        panel_l.addWidget(mode_box)
+        vis_l.addWidget(mode_box)
 
         # -- image colors
         color_box = QGroupBox("Image Colors")
@@ -209,7 +237,7 @@ class MainWindow(QMainWindow):
             lambda t: setattr(self.settings, "color_blend_mode", t))
         brow.addWidget(self.blend_combo)
         cl.addLayout(brow)
-        panel_l.addWidget(color_box)
+        vis_l.addWidget(color_box)
 
         # -- video display
         vid_box = QGroupBox("Video Display")
@@ -231,7 +259,7 @@ class MainWindow(QMainWindow):
         self.video_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_thumb.setText("no video")
         vl.addWidget(self.video_thumb)
-        panel_l.addWidget(vid_box)
+        src_l.addWidget(vid_box)
 
         # -- depth point cloud (mode 9)
         pc_box = QGroupBox("Depth Point Cloud  (mode 9)")
@@ -305,7 +333,8 @@ class MainWindow(QMainWindow):
         pcl.addLayout(brow2)
         pc_spin("Band push", 0.0, 0.4, 0.02, "pc_band_push",
                 "How far each band's energy displaces its own zone")
-        panel_l.addWidget(pc_box)
+        self._pc_box = pc_box
+        vis_l.addWidget(pc_box)
 
         # -- reactive 3D text (mode 10)
         txt_box = QGroupBox("Reactive 3D Text  (mode 10)")
@@ -336,10 +365,11 @@ class MainWindow(QMainWindow):
                  "How far each frequency band pushes its part of the word")
         txt_spin("Beat explode", 0.0, 4.0, 0.2, "text_explode",
                  "How violently kicks scatter the letters into dust")
-        panel_l.addWidget(txt_box)
+        self._txt_box = txt_box
+        vis_l.addWidget(txt_box)
 
         # -- settings
-        set_box = QGroupBox("Settings")
+        set_box = QGroupBox("Analysis && Motion")
         sl = QVBoxLayout(set_box)
 
         def spin_row(label, lo, hi, step, value, cb):
@@ -371,6 +401,16 @@ class MainWindow(QMainWindow):
         self.autocam_check.toggled.connect(
             lambda on: setattr(self.settings, "auto_camera", on))
         sl.addWidget(self.autocam_check)
+        self.veldbg_check = QCheckBox("Velocity debug overlay")
+        self.veldbg_check.setChecked(self.settings.show_velocity_debug)
+        self.veldbg_check.toggled.connect(
+            lambda on: setattr(self.settings, "show_velocity_debug", on))
+        sl.addWidget(self.veldbg_check)
+        mot_l.addWidget(set_box)
+
+        # -- post-processing FX
+        post_box = QGroupBox("Post-processing")
+        sl = QVBoxLayout(post_box)
         self.bloom_check = QCheckBox("Bloom glow (GPU)")
         self.bloom_check.setChecked(self.settings.bloom)
         self.bloom_check.toggled.connect(self._toggle_bloom)
@@ -394,12 +434,7 @@ class MainWindow(QMainWindow):
         self.antic_check.toggled.connect(
             lambda on: setattr(self.settings, "anticipation", on))
         sl.addWidget(self.antic_check)
-        self.veldbg_check = QCheckBox("Velocity debug overlay")
-        self.veldbg_check.setChecked(self.settings.show_velocity_debug)
-        self.veldbg_check.toggled.connect(
-            lambda on: setattr(self.settings, "show_velocity_debug", on))
-        sl.addWidget(self.veldbg_check)
-        panel_l.addWidget(set_box)
+        fx_l.addWidget(post_box)
 
         # -- drum grain FX
         fx_box = QGroupBox("Drum Grain FX")
@@ -424,7 +459,7 @@ class MainWindow(QMainWindow):
             lambda v: setattr(self.settings, "grain_intensity", v))
         irow.addWidget(gspin)
         fxl.addLayout(irow)
-        panel_l.addWidget(fx_box)
+        fx_l.addWidget(fx_box)
 
         # -- export
         exp_box = QGroupBox("Export")
@@ -471,17 +506,19 @@ class MainWindow(QMainWindow):
             "solderless.engineering SP-1 stem loader. BPM goes in the filename.")
         self.sp1_btn.clicked.connect(self._export_sp1)
         el.addWidget(self.sp1_btn)
-        panel_l.addWidget(exp_box)
+        exp_l.addWidget(exp_box)
 
-        panel_l.addStretch(1)
-        scroll = QScrollArea()
-        scroll.setWidget(panel)
-        scroll.setWidgetResizable(True)
-        scroll.setMinimumWidth(300)
-        scroll.setMaximumWidth(360)
-        splitter.addWidget(scroll)
+        for lay in (src_l, mix_l, vis_l, mot_l, fx_l, exp_l):
+            lay.addStretch(1)
+        for tab, label in ((src_tab, "Source"), (mix_tab, "Mix"),
+                           (vis_tab, "Visuals"), (mot_tab, "Motion"),
+                           (fx_tab, "FX"), (exp_tab, "Export")):
+            self.tabs.addTab(tab, label)
+        left.setMinimumWidth(360)
+        left.setMaximumWidth(430)
+        splitter.addWidget(left)
 
-        # right: canvas + info + spectrum
+        # right: canvas + info + spectrum + transport
         right = QWidget()
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
@@ -491,8 +528,13 @@ class MainWindow(QMainWindow):
         rl.addWidget(self.viz.canvas.native, stretch=1)
         self.spectrum = SpectrumWidget()
         rl.addWidget(self.spectrum)
+        rl.addWidget(self.transport)
         splitter.addWidget(right)
+        splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([390, 950])   # else the tab labels get elided
+        splitter.setChildrenCollapsible(False)
+        self._update_mode_panels()
 
     def _connect_engine(self):
         self.engine.duration_changed.connect(self._on_duration)
@@ -710,11 +752,19 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------- new features
 
+    def _update_mode_panels(self):
+        """Only the active mode's own settings card is shown, so the Visuals
+        tab stays short instead of listing every mode's options at once."""
+        cur = self.viz.current
+        self._pc_box.setVisible(cur == 8)
+        self._txt_box.setVisible(cur == 9)
+
     def _mode_changed(self, k: int):
         old = self.viz.current
         self._mode_prefs[str(old)] = {"palette": self.settings.palette,
                                       "grain": self.settings.grain_mode}
         self.viz.set_mode(k)
+        self._update_mode_panels()
         prefs = self._mode_prefs.get(str(k))
         if prefs:
             self.palette_combo.setCurrentText(prefs["palette"])
@@ -820,8 +870,17 @@ class MainWindow(QMainWindow):
         self._midi = MidiInput(self)
         self._midi.note_on.connect(self._on_midi_note)
         self._midi.cc.connect(self._on_midi_cc)
-        self._midi.status.connect(self.info_bar.status.setText)
+        self._midi.status.connect(self._midi_status)
         self._midi.start()
+
+    def _midi_status(self, msg: str):
+        """A machine with many MIDI ports produces a status line longer than
+        the window; name the first and count the rest."""
+        if msg.startswith("MIDI: "):
+            names = [n.strip() for n in msg[6:].split(",") if n.strip()]
+            if len(names) > 1:
+                msg = f"MIDI: {names[0]} (+{len(names) - 1} more)"
+        self.info_bar.status.setText(msg)
 
     def _on_midi_note(self, note: int, velocity: int):
         if 36 <= note < 36 + len(MODE_CLASSES):

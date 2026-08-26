@@ -232,7 +232,8 @@ class VizManager:
         self._spin_fx.set_target(0.0)
 
         # --- trails: length follows energy, stretches through the build-up
-        strength = self.settings.trail_amount
+        strength = (self.settings.trail_amount
+                    * self.modes[self.current].trail_scale)
         self._trail_len.set_target(frame.rms * 0.6 + ant * 1.6)
         tl = float(np.clip(self._trail_len.update(dt), 0.0, 3.0))
         c.trails_enabled = self.settings.trails

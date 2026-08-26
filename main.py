@@ -19,6 +19,8 @@ def main() -> int:
     vispy.use(app="pyqt6")
 
     app = QApplication(sys.argv)
+    from visualizer.ui.style import STYLESHEET
+    app.setStyleSheet(STYLESHEET)
     app.setApplicationName("NeanderthalV")
     app.setOrganizationName("NeanderthalV")
 

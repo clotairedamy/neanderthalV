@@ -10,6 +10,7 @@ class BaseMode:
     camera_distance = 6.0
     camera_elevation: float | None = None   # set to force a viewing angle
     consumes_video = False    # True: mode renders the video itself (no backdrop)
+    trail_scale = 1.0         # per-mode feedback-trail multiplier
 
     def __init__(self, view, palette, settings, profile):
         self.view = view
