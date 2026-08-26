@@ -11,7 +11,8 @@ from vispy import scene
 
 from ..physics.velocity import VelocityArray, VelocityValue
 from .base import BaseMode
-from .geometry import icosphere, rotation_matrix, vertex_normals_sphere
+from .geometry import (icosphere, lambert, rotation_matrix,
+                       vertex_normals_sphere)
 
 
 class IcosphereMode(BaseMode):
@@ -33,7 +34,7 @@ class IcosphereMode(BaseMode):
         self.mesh = scene.visuals.Mesh(
             vertices=self.verts0.astype(np.float32), faces=self.faces,
             vertex_colors=np.ones((len(self.verts0), 4), np.float32),
-            shading="smooth", parent=self.view.scene)
+            shading=None, parent=self.view.scene)
         self.wire = scene.visuals.Mesh(
             vertices=self.verts0.astype(np.float32) * 1.001, faces=self.faces,
             color=(1, 1, 1, 0.08), mode="lines", parent=self.view.scene)
@@ -62,7 +63,9 @@ class IcosphereMode(BaseMode):
         colors = np.ones((len(verts), 4), np.float32)
         base = self.palette.colors[self.vert_band]
         bright = 0.35 + 0.65 * np.clip(disp[self.vert_band], 0, 1)[:, None]
-        colors[:, :3] = np.clip(base * bright, 0, 1)
+        # lighting baked in; a deformed unit sphere's normal is its position
+        shade = lambert(self.normals @ R.T)
+        colors[:, :3] = np.clip(base * bright * shade, 0, 1)
 
         self.mesh.set_data(vertices=verts.astype(np.float32), faces=self.faces,
                            vertex_colors=colors)

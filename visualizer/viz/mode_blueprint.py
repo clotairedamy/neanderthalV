@@ -142,6 +142,7 @@ class BlueprintMode(BaseMode):
         self.tilt = VelocityValue(0.0, accel=5.0, damping=0.88)
         self.rot_angle = 0.0
         self.sphere_angle = 0.0
+        self._mesh_tick = 0
         self._t = 0.0
         self._last_ft = None
 
@@ -224,15 +225,18 @@ class BlueprintMode(BaseMode):
         self.sphere_tr.reset()
         self.sphere_tr.scale((sb, sb, sb))
         self.sphere_tr.rotate(np.degrees(-self.sphere_angle), (0.3, 0.4, 1.0))
-        # audio-morphing sphere (bass lobes + mid twist)
-        mv = morph_sphere(self._sv, self._t, morph_amt,
-                          twist_amt).astype(np.float32)
-        self.sphere_body.set_data(vertices=mv * 0.97, faces=self._sf,
-                                  color=(0.05, 0.055, 0.07, 1.0))
-        self.sphere_wire.set_data(vertices=mv, faces=self._sf,
-                                  color=(1.0, 1.0, 1.0,
-                                         np.clip(0.3 + 0.4 * mids
-                                                 + 0.4 * flash, 0, 0.95)))
+        # Mesh rebuilds cost ~3.5 ms; the morph is slow, so refresh the
+        # geometry every 3rd frame and let the transform handle spin/scale.
+        self._mesh_tick += 1
+        if self._mesh_tick % 3 == 0:
+            mv = morph_sphere(self._sv, self._t, morph_amt,
+                              twist_amt).astype(np.float32)
+            self.sphere_body.set_data(vertices=mv * 0.97, faces=self._sf,
+                                      color=(0.05, 0.055, 0.07, 1.0))
+            self.sphere_wire.set_data(vertices=mv, faces=self._sf,
+                                      color=(1.0, 1.0, 1.0,
+                                             np.clip(0.3 + 0.4 * mids
+                                                     + 0.4 * flash, 0, 0.95)))
 
         # particle physics: outward stream + swirl, momentum + damping
         r = np.linalg.norm(self.pos, axis=1, keepdims=True) + 1e-6

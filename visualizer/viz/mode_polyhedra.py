@@ -14,7 +14,8 @@ from vispy import scene
 from ..audio.analyzer import STEMS
 from ..physics.velocity import VelocityValue
 from .base import BaseMode
-from .geometry import cube, icosahedron, octahedron, rotation_matrix, tetrahedron
+from .geometry import (cube, icosahedron, lambert, octahedron,
+                       rotation_matrix, tetrahedron)
 
 
 class PolyhedraMode(BaseMode):
@@ -46,7 +47,7 @@ class PolyhedraMode(BaseMode):
         self.mesh = scene.visuals.Mesh(
             vertices=np.zeros((offset, 3), np.float32), faces=self.faces,
             vertex_colors=np.ones((offset, 4), np.float32),
-            shading="flat", parent=self.view.scene)
+            shading=None, parent=self.view.scene)
         self.visuals = [self.mesh]
 
     def update(self, frame, dt):
@@ -76,10 +77,14 @@ class PolyhedraMode(BaseMode):
                                np.sin(a * 0.7) * 0.8,
                                np.sin(a) * it["radius"]])
             R = rotation_matrix(it["axis"], it["spin_angle"])
-            verts[it["slice"]] = (it["verts"] @ R.T) * s + center
+            rv = it["verts"] @ R.T
+            verts[it["slice"]] = rv * s + center
 
             c = self.palette.stem_color(it["stem"])
-            colors[it["slice"], :3] = np.clip(c * (0.4 + 0.6 * e), 0, 1)
+            # these solids' vertices sit on the unit sphere, so the rotated
+            # vertex direction is a usable normal for baked lighting
+            shade = lambert(rv / (np.linalg.norm(rv, axis=1, keepdims=True) + 1e-9))
+            colors[it["slice"], :3] = np.clip(c * (0.4 + 0.6 * e) * shade, 0, 1)
 
         self.mesh.set_data(vertices=verts, faces=self.faces, vertex_colors=colors)
 

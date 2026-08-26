@@ -571,8 +571,17 @@ class MainWindow(QMainWindow):
         self.analysis_timer.timeout.connect(self._analysis_tick)
         self.analysis_timer.start()
 
+        # Pace rendering to the display, not a hard-coded 60. A 16 ms timer on
+        # a 120 Hz screen caps at 62 fps AND beats against the 8.3 ms vsync
+        # interval, which reads as judder even when the average looks fine.
+        screen = self.screen() or QApplication.primaryScreen()
+        hz = screen.refreshRate() if screen else 60.0
+        if not hz or hz < 24:
+            hz = 60.0
+        hz = min(hz, float(self.profile.max_fps))
         self.render_timer = QTimer(self)
-        self.render_timer.setInterval(1000 // self.profile.target_fps)
+        self.render_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.render_timer.setInterval(max(1, round(1000.0 / hz)))
         self.render_timer.timeout.connect(self._render_tick)
         self.render_timer.start()
 

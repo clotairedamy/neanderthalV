@@ -12,6 +12,7 @@ from vispy import scene
 
 from ..physics.velocity import VelocityValue
 from .base import BaseMode
+from .geometry import lambert
 
 
 class TopologyMode(BaseMode):
@@ -49,7 +50,7 @@ class TopologyMode(BaseMode):
         self.mesh = scene.visuals.Mesh(
             vertices=verts.astype(np.float32), faces=self.faces,
             vertex_colors=np.ones((verts.shape[0], 4), np.float32),
-            shading="smooth", parent=self.view.scene)
+            shading=None, parent=self.view.scene)
         self.visuals = [self.mesh]
 
     def update(self, frame, dt):
@@ -81,7 +82,11 @@ class TopologyMode(BaseMode):
         norm = np.clip((h + 1.2) / 2.4, 0, 1)
         lut = self.palette.lut(64)
         colors = np.ones((len(h), 4), np.float32)
-        colors[:, :3] = lut[(norm * 63).astype(int)]
+        # surface normal from the height gradient, then baked lighting
+        gy, gx = np.gradient(self.heights)
+        nrm = np.stack([-gx.ravel(), -gy.ravel(), np.full(h.size, 0.35)], 1)
+        nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
+        colors[:, :3] = lut[(norm * 63).astype(int)] * lambert(nrm)
         self.mesh.set_data(vertices=verts.astype(np.float32),
                            faces=self.faces, vertex_colors=colors)
 

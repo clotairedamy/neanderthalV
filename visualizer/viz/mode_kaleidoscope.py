@@ -13,7 +13,8 @@ from vispy import scene
 
 from ..physics.velocity import VelocityValue
 from .base import BaseMode
-from .geometry import icosahedron, octahedron, rotation_matrix, subdivide
+from .geometry import (icosahedron, lambert, octahedron,
+                       rotation_matrix, subdivide)
 
 
 class KaleidoscopeMode(BaseMode):
@@ -44,7 +45,7 @@ class KaleidoscopeMode(BaseMode):
         self.mesh = scene.visuals.Mesh(
             vertices=np.zeros((offset, 3), np.float32), faces=self.faces,
             vertex_colors=np.ones((offset, 4), np.float32),
-            shading="flat", parent=self.view.scene)
+            shading=None, parent=self.view.scene)
         self.visuals = [self.mesh]
 
         self.rot = VelocityValue(0.4, accel=4.0, damping=self.settings.damping)
@@ -74,9 +75,11 @@ class KaleidoscopeMode(BaseMode):
         colors = np.ones((self.n_verts, 4), np.float32)
 
         Rc = rotation_matrix(np.array([0.2, 1.0, 0.3]), self.angle * 2.0)
-        verts[self.slices[0]] = (self.center_verts @ Rc.T) * s * 0.9
+        cv = self.center_verts @ Rc.T
+        verts[self.slices[0]] = cv * s * 0.9
         c0 = self.palette.band_color(3)
-        colors[self.slices[0], :3] = np.clip(c0 * (0.5 + frame.rms), 0, 1)
+        colors[self.slices[0], :3] = np.clip(
+            c0 * (0.5 + frame.rms) * lambert(cv), 0, 1)
 
         for meta, sl in zip(self.sat_meta, self.slices[1:]):
             ring, k = meta["ring"], meta["k"]
@@ -91,9 +94,10 @@ class KaleidoscopeMode(BaseMode):
                                  self.angle * 3.0 + k)
             band = (k + ring * 3) % 7
             e = frame.bands[band]
-            verts[sl] = (self.sat_verts @ Rs.T) * (0.35 + e * 0.5) * s + center
+            sv = self.sat_verts @ Rs.T
+            verts[sl] = sv * (0.35 + e * 0.5) * s + center
             c = self.palette.band_color(band)
-            colors[sl, :3] = np.clip(c * (0.45 + 0.55 * e), 0, 1)
+            colors[sl, :3] = np.clip(c * (0.45 + 0.55 * e) * lambert(sv), 0, 1)
 
         self.mesh.set_data(vertices=verts, faces=self.faces, vertex_colors=colors)
 

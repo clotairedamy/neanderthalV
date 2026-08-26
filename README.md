@@ -23,8 +23,26 @@ own machine you'll need to sign & notarize with your Apple Developer ID
 Gatekeeper.
 
 **Tests:** `pip install -r requirements-dev.txt && python -m pytest tests/`
-(36 tests covering analysis, beat grid, anticipation, stems, SP-1 export,
-physics, geometry, palettes, presets, point-cloud and text geometry).
+(39 tests covering analysis, beat grid, anticipation, stems, SP-1 export,
+physics, geometry, palettes, presets, point-cloud and tessellated text).
+
+## Performance
+
+Rendering is paced to the display's actual refresh rate rather than a fixed
+60 Hz timer, and the heavy per-frame work runs on the GPU: the Julia set is
+a fragment shader, the depth point cloud and tessellated text animate in
+vertex shaders with geometry uploaded once, and the mesh modes bake their
+own lighting so vispy does not recompute normals and re-upload every frame.
+Measured draw cost per frame on an M-series Mac at 1000x700 (2x Retina):
+
+| mode | before | after |
+| --- | --- | --- |
+| Reactive Fractal | 11.7 ms | 1.4 ms |
+| Waveform Topology | 13.2 ms | 5.8 ms |
+| Frequency Icosphere | 14.1 ms | 8.8 ms |
+| Polyhedra / Kaleidoscope | 9.1 ms | 4.6 ms |
+| Blueprint / Fiber Nebula | 10.8 ms | 5.6-6.5 ms |
+| Reactive 3D Text | 2.2 ms | 0.8 ms |
 
 ## Interface
 
@@ -123,11 +141,13 @@ canvas.
    depth in a vertex shader (145k points on Mac, ~30k on the Pi). Extended
    well past the original — see below.
 
-10. **Reactive 3D Text** — your own words rasterized into a 3D point cloud
-   and extruded into 7 depth layers with front-to-back shading. Long words
-   wrap to two lines so the letters stay large, and the word *sways* within
-   a bounded angle rather than spinning freely — a continuously rotating
-   word is edge-on and unreadable half the time. The word doubles as a spectrum analyzer: a
+10. **Reactive 3D Text** — your words built as solid, opaque, extruded 3D
+   type and tessellated into chunks, after the three.js
+   [`webgl_modifier_tessellation`](https://threejs.org/examples/#webgl_modifier_tessellation)
+   example: each chunk rotates and pushes away from its own centre on a
+   kick, then settles back into crisp letterforms. Long words wrap to two
+   lines and the word sways within a bounded angle, so it stays readable
+   while a track plays. The word doubles as a spectrum analyzer: a
    point's horizontal position picks its frequency band, so the left of the
    word answers the bass and the right the highs — each zone in its own
    color and pushed toward the viewer by that band. Kicks blow the letters

@@ -102,3 +102,19 @@ def rotation_matrix(axis: np.ndarray, angle: float) -> np.ndarray:
         [y * x * C + z * s, c + y * y * C, y * z * C - x * s],
         [z * x * C - y * s, z * y * C + x * s, c + z * z * C],
     ])
+
+
+LIGHT_DIR = np.array([0.35, 0.55, 0.75])
+LIGHT_DIR = LIGHT_DIR / np.linalg.norm(LIGHT_DIR)
+
+
+def lambert(normals: np.ndarray, ambient: float = 0.35) -> np.ndarray:
+    """Per-vertex diffuse term, baked into vertex colours.
+
+    vispy's MeshVisual recomputes normals on the CPU and re-expands the mesh
+    every time `shading` is set and the geometry changes — roughly 5.5 ms a
+    frame even for a small sphere. Our normals are analytic (or cheap to
+    derive), so we shade ourselves and leave `shading=None`.
+    """
+    d = normals @ LIGHT_DIR
+    return (ambient + (1.0 - ambient) * np.clip(d, 0.0, 1.0))[:, None]

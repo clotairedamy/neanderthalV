@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import numpy as np
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QColor, QPainter, QLinearGradient, QBrush
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QSize
+from PyQt6.QtGui import (QBrush, QColor, QLinearGradient, QPainter,
+                         QPolygonF)
 from PyQt6.QtWidgets import (QColorDialog, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QPushButton, QSlider, QVBoxLayout, QWidget)
 
@@ -58,14 +59,15 @@ class SpectrumWidget(QWidget):
                   "bass": QColor(100, 160, 255), "other": QColor(140, 255, 160)}
         y0 = sh + 12
         lane = (h - y0) / 4
+        pts_x = np.linspace(0, w, len(next(iter(self.stem_history.values()))))
         for k, s in enumerate(STEMS):
             hist = self.stem_history[s]
             p.setPen(colors[s])
-            base = int(y0 + lane * (k + 0.9))
-            pts_x = np.linspace(0, w, len(hist))
-            for i in range(1, len(hist)):
-                p.drawLine(int(pts_x[i - 1]), base - int(hist[i - 1] * (lane - 2)),
-                           int(pts_x[i]), base - int(hist[i] * (lane - 2)))
+            base = y0 + lane * (k + 0.9)
+            ys = base - hist * (lane - 2)
+            # one polyline beats ~120 drawLine calls per stem per tick
+            p.drawPolyline(QPolygonF([QPointF(float(x), float(y))
+                                      for x, y in zip(pts_x, ys)]))
         p.end()
 
 

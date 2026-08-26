@@ -110,6 +110,7 @@ class FiberMode(BaseMode):
         self.spin_angle = 0.0
         self._t = 0.0
         self._last_ft = None
+        self._mesh_tick = 0
 
         self.visuals = [self.sphere_body, self.sphere_wire, self.markers,
                         self.trails, self.vortex, *self.annotations.visuals]
@@ -217,12 +218,19 @@ class FiberMode(BaseMode):
         self.sphere_tr.reset()
         self.sphere_tr.scale((breath, breath, breath))
         self.sphere_tr.rotate(np.degrees(self.spin_angle), (0.25, 0.9, 0.35))
-        mv = morph_sphere(self._sv, t, morph_amt, twist_amt).astype(np.float32)
-        wire_a = np.clip(0.28 + 0.4 * bass + 0.35 * flash, 0, 0.9)
-        self.sphere_body.set_data(vertices=mv * 0.97, faces=self._sf,
-                                  vertex_colors=self._body_colors)
-        self.sphere_wire.set_data(vertices=mv, faces=self._sf,
-                                  color=(1.0, 1.0, 1.0, wire_a))
+        # Rebuilding a vispy Mesh costs ~4 ms; the morph is slow enough that
+        # refreshing it every 3rd frame is indistinguishable. Rotation and
+        # scale still update every frame via the transform, which is free.
+        self._mesh_tick += 1
+        if self._mesh_tick % 3 == 0:
+            mv = morph_sphere(self._sv, t, morph_amt,
+                              twist_amt).astype(np.float32)
+            wire_a = np.clip(0.28 + 0.4 * bass + 0.35 * flash, 0, 0.9)
+            # NB: Mesh.set_data needs the geometry again - color alone clears it
+            self.sphere_body.set_data(vertices=mv * 0.97, faces=self._sf,
+                                      vertex_colors=self._body_colors)
+            self.sphere_wire.set_data(vertices=mv, faces=self._sf,
+                                      color=(1.0, 1.0, 1.0, wire_a))
 
         # --- plumes
         self.prev[:] = self.pos

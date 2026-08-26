@@ -61,15 +61,18 @@ class PerformanceProfile:
     topology_grid: int
     analysis_hz: int
     video_max_height: int
+    max_fps: int = 240
 
 
 MACOS_PROFILE = PerformanceProfile(
     name="macos", target_fps=60, particle_count=3200, fractal_resolution=320,
     icosphere_subdivisions=3, topology_grid=90, analysis_hz=30, video_max_height=1080,
+    max_fps=240,
 )
 RPI_PROFILE = PerformanceProfile(
     name="rpi5", target_fps=30, particle_count=800, fractal_resolution=160,
     icosphere_subdivisions=2, topology_grid=50, analysis_hz=30, video_max_height=720,
+    max_fps=30,
 )
 
 
@@ -106,7 +109,7 @@ class Settings:
     pc_band_push: float = 0.10    # how far each band's energy displaces its zone
     # reactive 3D text (mode 10)
     text_content: str = "NEANDERTHALV"
-    text_depth: float = 0.38      # per-band forward push
+    text_depth: float = 0.22      # per-band forward push
     text_sway: float = 0.45       # max yaw in radians (~26 deg)
     text_explode: float = 0.7     # beat scatter strength
     pc_cutoff: float = 0.08
