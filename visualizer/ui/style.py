@@ -2,6 +2,20 @@
 
 Applied once to the QApplication so dialogs inherit it too.
 """
+import sys
+
+# Qt does not fall back through a CSS-style family list the way a browser
+# does; naming a family that is not installed makes it populate every font
+# alias (slow) and log a warning. So pick the platform's own UI face.
+if sys.platform == "darwin":
+    UI_FONT = '"Helvetica Neue", Helvetica, Arial'
+    MONO_FONT = 'Menlo, Monaco, Courier'
+elif sys.platform.startswith("win"):
+    UI_FONT = '"Segoe UI", Tahoma, Arial'
+    MONO_FONT = 'Consolas, "Courier New"'
+else:
+    UI_FONT = '"DejaVu Sans", "Noto Sans", Arial'
+    MONO_FONT = '"DejaVu Sans Mono", "Liberation Mono", monospace'
 
 BG = "#101116"          # window
 PANEL = "#191b22"       # cards / group boxes
@@ -16,7 +30,7 @@ STYLESHEET = f"""
 QWidget {{
     background: {BG};
     color: {TEXT};
-    font-family: "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    font-family: {UI_FONT};
     font-size: 12px;
 }}
 QToolTip {{

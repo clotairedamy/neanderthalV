@@ -8,9 +8,28 @@ import sys
 import os
 
 
+def _quiet_third_party_warnings() -> None:
+    """Silence two harmless-but-noisy warnings from dependencies.
+
+    librosa's numba ufuncs get compiled once per worker thread, and numba
+    warns that the signature was already compiled. It is not actionable from
+    here and fires on every track load.
+    """
+    import warnings
+    warnings.filterwarnings(
+        "ignore", message=r".*previously compiled argument types.*")
+    try:
+        from numba.core.errors import NumbaWarning
+        warnings.filterwarnings("ignore", category=NumbaWarning,
+                                message=r".*Compilation requested.*")
+    except Exception:
+        pass
+
+
 def main() -> int:
     # Vispy must know the backend before any canvas is created.
     os.environ.setdefault("VISPY_APP_BACKEND", "pyqt6")
+    _quiet_third_party_warnings()
 
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtCore import Qt

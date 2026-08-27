@@ -21,6 +21,7 @@ from ..color.palette import PaletteManager
 from ..config import active_profile
 from ..video.player import VIDEO_EXTS, VideoSource
 from ..viz.manager import MODE_CLASSES, VizManager
+from .style import MONO_FONT
 from .widgets import InfoBar, PaletteSwatches, SpectrumWidget, StemMixer
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff")
@@ -133,7 +134,7 @@ class MainWindow(QMainWindow):
         self.play_btn.clicked.connect(self._toggle_play)
         tr.addWidget(self.play_btn)
         self.time_label = QLabel("0:00 / 0:00")
-        self.time_label.setStyleSheet("font-family: Menlo, monospace;")
+        self.time_label.setStyleSheet(f"font-family: {MONO_FONT};")
         tr.addWidget(self.time_label)
         self.seek_slider = QSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setRange(0, 1000)
@@ -149,7 +150,7 @@ class MainWindow(QMainWindow):
             lambda v: (self.engine.set_speed(v / 100),
                        self.speed_label.setText(f"{v / 100:.2f}x")))
         self.speed_label = QLabel("1.00x")
-        self.speed_label.setStyleSheet("font-family: Menlo, monospace;")
+        self.speed_label.setStyleSheet(f"font-family: {MONO_FONT};")
         self.speed_slider.sliderReleased.connect(self.engine.apply_pitch_speed)
         tr.addWidget(self.speed_slider)
         tr.addWidget(self.speed_label)

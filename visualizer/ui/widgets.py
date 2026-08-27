@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QColorDialog, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QPushButton, QSlider, QVBoxLayout, QWidget)
 
 from ..audio.analyzer import STEMS
+from .style import MONO_FONT
 
 
 class SpectrumWidget(QWidget):
@@ -195,7 +196,7 @@ class InfoBar(QWidget):
         self.status = QLabel("")
         self.status.setStyleSheet("color: #8a8;")
         for w in (self.bpm, self.fps, self.vel, self.mode):
-            w.setStyleSheet("font-family: Menlo, monospace; color: #ccd;")
+            w.setStyleSheet(f"font-family: {MONO_FONT}; color: #ccd;")
             lay.addWidget(w)
         lay.addStretch(1)
         lay.addWidget(self.status)
