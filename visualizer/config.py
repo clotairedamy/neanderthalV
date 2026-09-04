@@ -113,6 +113,10 @@ class Settings:
     text_sway: float = 0.45       # max yaw in radians (~26 deg)
     text_explode: float = 0.7     # beat scatter strength
     pc_cutoff: float = 0.08
+    # harmonic rosette (mode 11)
+    rose_morph: float = 0.55      # how far a band's energy swings its ring open
+    rose_relief: float = 0.45     # spectrum lift out of the ring's plane
+    rose_spin: float = 1.0        # counter-rotation rate multiplier
     bloom: bool = True              # GPU glow post-processing
     trails: bool = True             # feedback echo trails
     trail_amount: float = 1.0       # 0 = off-ish, 2 = heavy tunnel feedback

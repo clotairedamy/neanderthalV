@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
         mix_l.addWidget(self.mixer)
 
         # -- visualization modes
-        mode_box = QGroupBox(f"Visualization  (keys 1–{len(MODE_CLASSES)})")
+        mode_box = QGroupBox("Visualization")
         ml = QVBoxLayout(mode_box)
         self.mode_radios = []
         for i, cls in enumerate(MODE_CLASSES):
@@ -368,6 +368,40 @@ class MainWindow(QMainWindow):
                  "How violently kicks scatter the letters into dust")
         self._txt_box = txt_box
         vis_l.addWidget(txt_box)
+
+        # -- harmonic rosette (mode 11)
+        rose_box = QGroupBox("Harmonic Rosette  (mode 11)")
+        rl2 = QVBoxLayout(rose_box)
+        cap = QLabel("Three string-art rings from assets/Lows, mids and higs "
+                     ".svg \u2014 one per band.")
+        cap.setWordWrap(True)
+        cap.setStyleSheet("color:#889;")
+        rl2.addWidget(cap)
+
+        def rose_spin_row(label, lo, hi, step, attr, tip=""):
+            r = QHBoxLayout()
+            lb3 = QLabel(label)
+            if tip:
+                lb3.setToolTip(tip)
+            r.addWidget(lb3)
+            sp = QDoubleSpinBox()
+            sp.setRange(lo, hi)
+            sp.setSingleStep(step)
+            sp.setValue(getattr(self.settings, attr))
+            sp.valueChanged.connect(lambda v, a=attr: setattr(self.settings, a, v))
+            r.addWidget(sp)
+            rl2.addLayout(r)
+
+        rose_spin_row("Bloom", 0.0, 1.5, 0.05, "rose_morph",
+                      "How far a band's energy swings its ring open \u2014 0 "
+                      "holds each ring at its drawn shape")
+        rose_spin_row("Relief", 0.0, 2.0, 0.05, "rose_relief",
+                      "How far the spectrum lifts the rim out of the ring's plane")
+        rose_spin_row("Spin", 0.0, 3.0, 0.1, "rose_spin",
+                      "Counter-rotation rate; the moir\u00e9 comes from the "
+                      "rings turning against each other")
+        self._rose_box = rose_box
+        vis_l.addWidget(rose_box)
 
         # -- settings
         set_box = QGroupBox("Analysis && Motion")
@@ -557,6 +591,10 @@ class MainWindow(QMainWindow):
             sc(str(i + 1), lambda k=i: self._select_mode(k))
         if len(MODE_CLASSES) >= 10:
             sc("0", lambda: self._select_mode(9))     # mode 10
+        # the digits run out at ten, so mode 11 onward take the keys beside them
+        for j, key in enumerate(("-", "=")):
+            if len(MODE_CLASSES) > 10 + j:
+                sc(key, lambda k=10 + j: self._select_mode(k))
         # stem toggles: V/D/B/O
         for key, stem in (("V", "vocals"), ("D", "drums"),
                           ("B", "bass"), ("O", "other")):
@@ -768,6 +806,7 @@ class MainWindow(QMainWindow):
         cur = self.viz.current
         self._pc_box.setVisible(cur == 8)
         self._txt_box.setVisible(cur == 9)
+        self._rose_box.setVisible(cur == 10)
 
     def _mode_changed(self, k: int):
         old = self.viz.current

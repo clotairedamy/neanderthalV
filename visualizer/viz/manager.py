@@ -25,10 +25,12 @@ from .mode_blueprint import BlueprintMode
 from .mode_fiber import FiberMode
 from .mode_pointcloud import PointCloudMode
 from .mode_text import TextMode
+from .mode_rosette import RosetteMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
-                BlueprintMode, FiberMode, PointCloudMode, TextMode]
+                BlueprintMode, FiberMode, PointCloudMode, TextMode,
+                RosetteMode]
 
 
 class VizManager:
