@@ -25,12 +25,12 @@ from .mode_blueprint import BlueprintMode
 from .mode_fiber import FiberMode
 from .mode_pointcloud import PointCloudMode
 from .mode_text import TextMode
-from .mode_rosette import RosetteMode
+from .mode_grid import GridMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
                 BlueprintMode, FiberMode, PointCloudMode, TextMode,
-                RosetteMode]
+                GridMode]
 
 
 class VizManager:
@@ -124,6 +124,7 @@ class VizManager:
         self._rec_frames = 0
         self._rec_t0 = 0.0
         self.NOMINAL_FPS = 60.0
+        self.BLOOM_BASE = self.canvas.bloom_amount
 
         self.set_mode(int(np.clip(settings.viz_mode, 0, len(self.modes) - 1)))
 
@@ -234,8 +235,11 @@ class VizManager:
         self._spin_fx.set_target(0.0)
 
         # --- trails: length follows energy, stretches through the build-up
-        strength = (self.settings.trail_amount
-                    * self.modes[self.current].trail_scale)
+        mode = self.modes[self.current]
+        strength = self.settings.trail_amount * mode.trail_scale
+        # glow is per-mode too: a crisp graphic mode should not be smeared by
+        # the same bloom that suits the glowing particle ones
+        c.bloom_amount = self.BLOOM_BASE * mode.bloom_scale
         self._trail_len.set_target(frame.rms * 0.6 + ant * 1.6)
         tl = float(np.clip(self._trail_len.update(dt), 0.0, 3.0))
         c.trails_enabled = self.settings.trails

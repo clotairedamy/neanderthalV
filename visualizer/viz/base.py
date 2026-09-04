@@ -11,6 +11,7 @@ class BaseMode:
     camera_elevation: float | None = None   # set to force a viewing angle
     consumes_video = False    # True: mode renders the video itself (no backdrop)
     trail_scale = 1.0         # per-mode feedback-trail multiplier
+    bloom_scale = 1.0         # per-mode glow multiplier (0 = crisp)
 
     def __init__(self, view, palette, settings, profile):
         self.view = view

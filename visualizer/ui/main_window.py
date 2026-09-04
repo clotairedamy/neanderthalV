@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QMainWindow,
     QMessageBox, QProgressDialog, QPushButton, QRadioButton, QScrollArea,
-    QSlider, QSplitter, QTabWidget, QVBoxLayout, QWidget)
+    QSlider, QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget)
 
 from ..audio.analyzer import STEMS, AnalysisFrame
 from ..audio.engine import AUDIO_EXTS, AudioEngine, extract_audio_from_video
@@ -369,16 +369,28 @@ class MainWindow(QMainWindow):
         self._txt_box = txt_box
         vis_l.addWidget(txt_box)
 
-        # -- harmonic rosette (mode 11)
-        rose_box = QGroupBox("Harmonic Rosette  (mode 11)")
-        rl2 = QVBoxLayout(rose_box)
-        cap = QLabel("Three string-art rings from assets/Lows, mids and higs "
-                     ".svg \u2014 one per band.")
+        # -- hiding grid (mode 11)
+        grid_box = QGroupBox("Hiding Grid  (mode 11)")
+        gl2 = QVBoxLayout(grid_box)
+        cap = QLabel("Black and white. A noise field warps the lattice and "
+                     "hides each cell\u2019s square; beats resize them.")
         cap.setWordWrap(True)
         cap.setStyleSheet("color:#889;")
-        rl2.addWidget(cap)
+        gl2.addWidget(cap)
 
-        def rose_spin_row(label, lo, hi, step, attr, tip=""):
+        crow = QHBoxLayout()
+        lbc = QLabel("Columns")
+        lbc.setToolTip("Grid resolution. The source drawing used 40.")
+        crow.addWidget(lbc)
+        self.grid_cols_spin = QSpinBox()
+        self.grid_cols_spin.setRange(4, 80)
+        self.grid_cols_spin.setValue(int(self.settings.grid_cols))
+        self.grid_cols_spin.valueChanged.connect(
+            lambda v: setattr(self.settings, "grid_cols", int(v)))
+        crow.addWidget(self.grid_cols_spin)
+        gl2.addLayout(crow)
+
+        def grid_spin(label, lo, hi, step, attr, tip=""):
             r = QHBoxLayout()
             lb3 = QLabel(label)
             if tip:
@@ -390,18 +402,19 @@ class MainWindow(QMainWindow):
             sp.setValue(getattr(self.settings, attr))
             sp.valueChanged.connect(lambda v, a=attr: setattr(self.settings, a, v))
             r.addWidget(sp)
-            rl2.addLayout(r)
+            gl2.addLayout(r)
 
-        rose_spin_row("Bloom", 0.0, 1.5, 0.05, "rose_morph",
-                      "How far a band's energy swings its ring open \u2014 0 "
-                      "holds each ring at its drawn shape")
-        rose_spin_row("Relief", 0.0, 2.0, 0.05, "rose_relief",
-                      "How far the spectrum lifts the rim out of the ring's plane")
-        rose_spin_row("Spin", 0.0, 3.0, 0.1, "rose_spin",
-                      "Counter-rotation rate; the moir\u00e9 comes from the "
-                      "rings turning against each other")
-        self._rose_box = rose_box
-        vis_l.addWidget(rose_box)
+        grid_spin("Noise scale", 0.5, 24.0, 0.5, "grid_noise",
+                  "Feature size of the field \u2014 low is broad and blocky, "
+                  "high is fine and busy")
+        grid_spin("Warp", 0.0, 2.5, 0.1, "grid_warp",
+                  "How far the field pushes the lattice nodes off-grid")
+        grid_spin("Beat resize", 0.0, 2.0, 0.1, "grid_beat",
+                  "How hard each beat swells the squares")
+        grid_spin("Flow", 0.0, 2.0, 0.05, "grid_flow",
+                  "How fast the field drifts when the track is quiet")
+        self._grid_box = grid_box
+        vis_l.addWidget(grid_box)
 
         # -- settings
         set_box = QGroupBox("Analysis && Motion")
@@ -806,7 +819,7 @@ class MainWindow(QMainWindow):
         cur = self.viz.current
         self._pc_box.setVisible(cur == 8)
         self._txt_box.setVisible(cur == 9)
-        self._rose_box.setVisible(cur == 10)
+        self._grid_box.setVisible(cur == 10)
 
     def _mode_changed(self, k: int):
         old = self.viz.current

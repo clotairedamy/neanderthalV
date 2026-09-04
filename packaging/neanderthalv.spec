@@ -10,10 +10,7 @@ hiddenimports = (
        "scipy._cyutility", "PIL.Image"]
 )
 datas = (collect_data_files("vispy") + collect_data_files("librosa")
-         + [("../assets/kinect.mp4", "assets")]
-         # the rosette mode reads these at runtime, so they must ship
-         + [(f"../assets/{n}", "assets")
-            for n in ("Lows.svg", "mids.svg", "higs.svg")])
+         + [("../assets/kinect.mp4", "assets")])
 
 try:
     import demucs  # noqa: F401
