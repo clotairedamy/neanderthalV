@@ -109,3 +109,105 @@ def test_scale_maps_over_the_files_observed_range():
     s = S_HI - (n * 0.5 + 0.5) * (S_HI - S_LO)
     assert s[0] == pytest.approx(S_HI)
     assert s[-1] == pytest.approx(S_LO)
+
+
+# --------------------------------------------------- cutout (mode 12)
+
+class _Cfg:
+    """Minimal stand-in for Settings; the mode only reads these."""
+    def __init__(self, **kw):
+        self.text_content = "BASS"
+        self.cutout_scale = 0.8
+        self.cutout_invert = False
+        self.__dict__.update(kw)
+
+
+def _cutout(**kw):
+    from visualizer.viz.mode_cutout import GridCutoutMode
+    m = GridCutoutMode.__new__(GridCutoutMode)
+    m.settings = _Cfg(**kw)
+    m._mask_key = None
+    m._word = None
+    m._node_key = None
+    m._nodes = None
+    return m
+
+
+def test_word_mask_marks_some_cells_but_not_the_whole_grid():
+    from visualizer.viz.mode_cutout import cell_text_mask
+    w = cell_text_mask("BASS", 64, 0.8)
+    assert w.shape == (64, 64)
+    assert 0.02 < w.mean() < 0.5
+
+
+def test_word_mask_is_flipped_so_the_word_is_not_upside_down():
+    """The raster's row 0 is the top; the grid's row 0 is at y = -1, which
+    the view puts at the bottom. Miss the flip and the word renders
+    mirrored vertically."""
+    from visualizer.viz.mode_cutout import cell_text_mask
+    # "A" has more ink low (its feet) than high (its apex)
+    w = cell_text_mask("A", 64, 0.8)
+    lower, upper = w[:32].sum(), w[32:].sum()
+    assert lower > upper
+
+
+def test_bigger_scale_covers_more_cells():
+    from visualizer.viz.mode_cutout import cell_text_mask
+    small = cell_text_mask("BASS", 64, 0.4).mean()
+    big = cell_text_mask("BASS", 64, 0.9).mean()
+    assert big > small * 1.5
+
+
+def test_void_empties_the_word_and_floors_the_ground():
+    from visualizer.viz.mode_cutout import GROUND_FLOOR
+    m = _cutout(cutout_invert=False)
+    cols = 64
+    rng = np.random.default_rng(0)
+    s = rng.uniform(S_LO, S_HI, (cols, cols))
+    out = m.shape_scale(s, cols, 1.0)
+    word = m._word_mask(cols)
+    assert np.all(out[word] == 0.0), "word cells must be empty"
+    ground = out[~word]
+    assert ground.min() >= GROUND_FLOOR - 1e-6, "ground must not go below the floor"
+    assert ground.max() <= 1.0 + 1e-6
+
+
+def test_an_emptied_cell_is_hidden_by_the_clipping():
+    """shape_scale only zeroes the scale; the existing clip has to be what
+    actually hides the cell."""
+    lo, hi = hiding_square(np.array([0.0]))
+    assert lo[0] >= hi[0]
+
+
+def test_invert_makes_the_word_solid_and_leaves_the_ground_alone():
+    m = _cutout(cutout_invert=True)
+    cols = 64
+    rng = np.random.default_rng(0)
+    s = rng.uniform(S_LO, S_HI, (cols, cols))
+    out = m.shape_scale(s, cols, 1.0)
+    word = m._word_mask(cols)
+    assert np.allclose(out[~word], s[~word]), "ground must be untouched"
+    assert np.ptp(out[word]) < 1e-6, "word cells must be one constant"
+    assert out[word][0] > 0.8, "word cells must be near a full square"
+
+
+def test_node_mask_clears_letter_interiors_but_keeps_the_outline():
+    m = _cutout(cutout_invert=False)
+    n = 65
+    keep = m.node_mask(n)
+    assert keep.shape == (n, n)
+    assert (keep == 0).any(), "no lattice was cleared"
+    word = m._word_mask(n - 1)
+    # a node is only cleared when all four of its cells are word cells, so
+    # strictly fewer nodes are cleared than there are word cells
+    assert (keep == 0).sum() < word.sum()
+
+
+def test_node_mask_is_returned_by_identity_so_it_can_be_cached():
+    m = _cutout()
+    assert m.node_mask(65) is m.node_mask(65)
+
+
+def test_invert_keeps_the_lattice_everywhere():
+    """With the word solid there is no void, so nothing should be cleared."""
+    assert _cutout(cutout_invert=True).node_mask(65) is None

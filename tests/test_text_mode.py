@@ -64,3 +64,60 @@ def test_normals_are_unit_length():
 def test_empty_text_falls_back():
     pos, *_ = tessellate(text_mask(""))
     assert len(pos) > 0
+
+
+# ------------------------------------------------ point-cloud style
+
+def test_points_land_inside_the_letterforms():
+    from visualizer.viz.mode_text import point_cloud, text_mask
+    mask = text_mask("BASS")
+    pos, sd, u, edge = point_cloud(mask, n_points=4000)
+    h, w = mask.shape
+    scale = min(3.0 / w, 1.7 / h)
+    # invert the mapping back to pixel coordinates
+    px = np.clip(np.rint(pos[:, 0] / scale + (w - 1) / 2).astype(int), 0, w - 1)
+    py = np.clip(np.rint(-pos[:, 2] / scale + (h - 1) / 2).astype(int), 0, h - 1)
+    inside = mask[py, px].mean()
+    assert inside > 0.95, f"only {inside:.0%} of points are on the glyphs"
+
+
+def test_sampling_is_weighted_toward_the_contours():
+    """Uniform area sampling is what made the first point-cloud text
+    unreadable; the contour bias is the whole fix."""
+    from visualizer.viz.mode_text import point_cloud, text_mask
+    pos, sd, u, edge = point_cloud(text_mask("BASS"), n_points=20000)
+    # more points near the boundary than deep inside the strokes
+    assert (edge > 0.5).sum() > (edge < 0.15).sum()
+
+
+def test_edge_drives_size_and_brightness_over_a_usable_range():
+    from visualizer.viz.mode_text import point_cloud, text_mask
+    _, _, _, edge = point_cloud(text_mask("BASS"), n_points=8000)
+    assert 0.0 <= edge.min() and edge.max() <= 1.0
+    assert edge.max() - edge.min() > 0.4
+
+
+def test_point_cloud_is_deterministic():
+    from visualizer.viz.mode_text import point_cloud, text_mask
+    m = text_mask("BASS")
+    a = point_cloud(m, n_points=2000)[0]
+    b = point_cloud(m, n_points=2000)[0]
+    assert np.array_equal(a, b)
+
+
+def test_point_cloud_matches_the_tessellated_extent():
+    """Both styles must occupy the same box, or switching between them
+    would jump the framing."""
+    from visualizer.viz.mode_text import point_cloud, tessellate, text_mask
+    m = text_mask("BASS")
+    tp = tessellate(m)[0]
+    pp = point_cloud(m, n_points=20000)[0]
+    for ax in (0, 2):
+        assert abs(pp[:, ax].max() - tp[:, ax].max()) < 0.12
+        assert abs(pp[:, ax].min() - tp[:, ax].min()) < 0.12
+
+
+def test_empty_text_still_produces_a_cloud():
+    from visualizer.viz.mode_text import point_cloud, text_mask
+    pos, sd, u, edge = point_cloud(text_mask(""), n_points=500)
+    assert len(pos) == 500 and np.isfinite(pos).all()

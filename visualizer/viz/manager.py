@@ -26,11 +26,12 @@ from .mode_fiber import FiberMode
 from .mode_pointcloud import PointCloudMode
 from .mode_text import TextMode
 from .mode_grid import GridMode
+from .mode_cutout import GridCutoutMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
                 BlueprintMode, FiberMode, PointCloudMode, TextMode,
-                GridMode]
+                GridMode, GridCutoutMode]
 
 
 class VizManager:

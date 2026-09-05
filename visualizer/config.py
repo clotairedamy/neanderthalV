@@ -112,6 +112,9 @@ class Settings:
     text_depth: float = 0.22      # per-band forward push
     text_sway: float = 0.45       # max yaw in radians (~26 deg)
     text_explode: float = 0.7     # beat scatter strength
+    text_mono: bool = False       # ignore the palette, render white
+    text_points: bool = False     # point-cloud letters instead of chunks
+    text_point_size: float = 2.4  # sprite size for the point-cloud style
     pc_cutoff: float = 0.08
     # hiding grid (mode 11)
     grid_cols: int = 40           # columns; the source drawing used 40
@@ -119,6 +122,11 @@ class Settings:
     grid_warp: float = 1.0        # lattice deformation amount
     grid_beat: float = 0.7        # how hard beats resize the squares
     grid_flow: float = 0.35       # how fast the field drifts
+
+    # grid cutout (mode 12)
+    cutout_cols: int = 80         # legibility vs fill rate; see mode_cutout
+    cutout_scale: float = 0.88    # share of the frame the word occupies
+    cutout_invert: bool = False   # word solid instead of word void
     bloom: bool = True              # GPU glow post-processing
     trails: bool = True             # feedback echo trails
     trail_amount: float = 1.0       # 0 = off-ish, 2 = heavy tunnel feedback

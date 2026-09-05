@@ -344,8 +344,7 @@ class MainWindow(QMainWindow):
         self.text_edit.setPlaceholderText("Type your text…")
         self.text_edit.setToolTip("Rasterized into a 3D point cloud; the word "
                                   "doubles as a spectrum analyzer")
-        self.text_edit.textChanged.connect(
-            lambda s: setattr(self.settings, "text_content", s))
+        self.text_edit.textChanged.connect(self._set_text_content)
         txl.addWidget(self.text_edit)
 
         def txt_spin(label, lo, hi, step, attr, tip=""):
@@ -366,6 +365,25 @@ class MainWindow(QMainWindow):
                  "How far each frequency band pushes its part of the word")
         txt_spin("Beat explode", 0.0, 4.0, 0.2, "text_explode",
                  "How violently kicks scatter the letters into dust")
+        txt_spin("Point size", 1.0, 12.0, 0.2, "text_point_size",
+                 "Sprite size, point-cloud style only")
+
+        self.text_mono_cb = QCheckBox("Monochrome")
+        self.text_mono_cb.setToolTip("Ignore the palette and render the word "
+                                     "in white")
+        self.text_mono_cb.setChecked(bool(self.settings.text_mono))
+        self.text_mono_cb.toggled.connect(
+            lambda v: setattr(self.settings, "text_mono", bool(v)))
+        txl.addWidget(self.text_mono_cb)
+
+        self.text_points_cb = QCheckBox("Point cloud letters")
+        self.text_points_cb.setToolTip("Scatter the word into points weighted "
+                                       "toward the letter outlines, instead "
+                                       "of solid chunks")
+        self.text_points_cb.setChecked(bool(self.settings.text_points))
+        self.text_points_cb.toggled.connect(
+            lambda v: setattr(self.settings, "text_points", bool(v)))
+        txl.addWidget(self.text_points_cb)
         self._txt_box = txt_box
         vis_l.addWidget(txt_box)
 
@@ -415,6 +433,58 @@ class MainWindow(QMainWindow):
                   "How fast the field drifts when the track is quiet")
         self._grid_box = grid_box
         vis_l.addWidget(grid_box)
+
+        # -- grid cutout (mode 12)
+        cut_box = QGroupBox("Grid Cutout  (mode 12)")
+        cl = QVBoxLayout(cut_box)
+        cap2 = QLabel("The hiding grid with the word above carved out of "
+                      "the middle.")
+        cap2.setWordWrap(True)
+        cap2.setStyleSheet("color:#889;")
+        cl.addWidget(cap2)
+
+        self.cut_text_edit = QLineEdit(self.settings.text_content)
+        self.cut_text_edit.setPlaceholderText("Word to carve\u2026")
+        self.cut_text_edit.setToolTip("Shared with the 3D text mode. Short "
+                                      "words carve most legibly.")
+        self.cut_text_edit.textChanged.connect(self._set_text_content)
+        cl.addWidget(self.cut_text_edit)
+
+        crow2 = QHBoxLayout()
+        lbc2 = QLabel("Columns")
+        lbc2.setToolTip("Legibility is cells per letter: a long word needs "
+                        "a fine grid, a short one reads at any size")
+        crow2.addWidget(lbc2)
+        self.cut_cols_spin = QSpinBox()
+        self.cut_cols_spin.setRange(16, 96)
+        self.cut_cols_spin.setValue(int(self.settings.cutout_cols))
+        self.cut_cols_spin.valueChanged.connect(
+            lambda v: setattr(self.settings, "cutout_cols", int(v)))
+        crow2.addWidget(self.cut_cols_spin)
+        cl.addLayout(crow2)
+
+        srow = QHBoxLayout()
+        lbs = QLabel("Word size")
+        lbs.setToolTip("Share of the frame the word occupies")
+        srow.addWidget(lbs)
+        sp2 = QDoubleSpinBox()
+        sp2.setRange(0.2, 0.95)
+        sp2.setSingleStep(0.02)
+        sp2.setValue(self.settings.cutout_scale)
+        sp2.valueChanged.connect(
+            lambda v: setattr(self.settings, "cutout_scale", v))
+        srow.addWidget(sp2)
+        cl.addLayout(srow)
+
+        self.cut_inv_cb = QCheckBox("Invert (word solid)")
+        self.cut_inv_cb.setToolTip("Keep the squares inside the letters and "
+                                   "clear the ground instead")
+        self.cut_inv_cb.setChecked(bool(self.settings.cutout_invert))
+        self.cut_inv_cb.toggled.connect(
+            lambda v: setattr(self.settings, "cutout_invert", bool(v)))
+        cl.addWidget(self.cut_inv_cb)
+        self._cut_box = cut_box
+        vis_l.addWidget(cut_box)
 
         # -- settings
         set_box = QGroupBox("Analysis && Motion")
@@ -813,13 +883,25 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------- new features
 
+    def _set_text_content(self, value: str) -> None:
+        """Both the text and cutout panels edit the same word."""
+        self.settings.text_content = value
+
     def _update_mode_panels(self):
         """Only the active mode's own settings card is shown, so the Visuals
         tab stays short instead of listing every mode's options at once."""
         cur = self.viz.current
         self._pc_box.setVisible(cur == 8)
         self._txt_box.setVisible(cur == 9)
-        self._grid_box.setVisible(cur == 10)
+        self._grid_box.setVisible(cur in (10, 11))
+        self._cut_box.setVisible(cur == 11)
+        # two fields, one setting: keep whichever is about to be shown in
+        # step with the other
+        for w in (self.text_edit, self.cut_text_edit):
+            if w.text() != self.settings.text_content:
+                w.blockSignals(True)
+                w.setText(self.settings.text_content)
+                w.blockSignals(False)
 
     def _mode_changed(self, k: int):
         old = self.viz.current

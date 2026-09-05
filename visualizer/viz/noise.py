@@ -9,12 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 
-# the classic 12 edge-midpoint gradients of a cube
-_GRAD3 = np.array([
-    [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-    [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-    [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]], np.float32)
-
 # Perlin's improved fade, 6t^5-15t^4+10t^3: zero first and second derivative
 # at the cell corners, so no creases show along the lattice
 def _fade(t):
@@ -47,11 +41,18 @@ def perlin3(x, y, z, perm: np.ndarray) -> np.ndarray:
     zi &= 255
 
     def corner(dx, dy, dz):
+        # Perlin's own gradient selection: the twelve cube-edge gradients
+        # have components in {-1, 0, 1}, so the dot product is a pair of
+        # signed picks rather than a multiply. Indexing a gradient table
+        # instead materializes an (N, 3) float array per corner, and with
+        # eight corners per sample that dominated the frame -- this is the
+        # same field, several times cheaper.
         h = perm[perm[perm[(xi + dx) & 255] + ((yi + dy) & 255)]
-                 + ((zi + dz) & 255)] % 12
-        g = _GRAD3[h]
-        return (g[..., 0] * (xf - dx) + g[..., 1] * (yf - dy)
-                + g[..., 2] * (zf - dz))
+                 + ((zi + dz) & 255)] & 15
+        x1, y1, z1 = xf - dx, yf - dy, zf - dz
+        u = np.where(h < 8, x1, y1)
+        v = np.where(h < 4, y1, np.where((h == 12) | (h == 14), x1, z1))
+        return (np.where(h & 1, -u, u) + np.where(h & 2, -v, v))
 
     def lerp(a, b, t):
         return a + t * (b - a)

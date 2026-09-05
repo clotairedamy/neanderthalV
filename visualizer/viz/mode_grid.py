@@ -66,7 +66,26 @@ class GridMode(BaseMode):
     # the source drawings are crisp vector work; glow just blurs the squares
     bloom_scale = 0.25
 
-    MAX_COLS = 80
+    MAX_COLS = 96
+    cols_attr = "grid_cols"     # which setting drives the column count
+    warp_cells = WARP_CELLS     # peak node displacement, in cells
+
+    def node_mask(self, n: int):
+        """Per-node multiplier on the lattice line and dot alpha, or None.
+
+        A cell driven to nothing still sits inside a drawn lattice, which
+        reads exactly like the holes the noise makes on its own. Clearing
+        the lines too is what turns a carved region into an actual void.
+        """
+        return None
+
+    def shape_scale(self, s, cols: int, swell: float):
+        """Let a subclass reshape the per-cell square scale before clipping.
+
+        `s` is the finished scale for every cell -- noise, beat swell and
+        spectrum already folded in -- so an override has the last word.
+        """
+        return s
 
     def build(self):
         self.perm = permutation(11)
@@ -80,7 +99,12 @@ class GridMode(BaseMode):
         self._last_ft = -1.0
 
         self.mesh = scene.visuals.Mesh(parent=self.view.scene)
-        self.mesh.set_gl_state("translucent", depth_test=False, cull_face=False)
+        # Every square is clipped to its own cell and the cells tile without
+        # overlapping, so no square is ever drawn over another and blending
+        # buys nothing -- while costing real fill rate when a beat swells
+        # them all to full size. Hidden cells collapse to zero area, so they
+        # need no alpha to disappear.
+        self.mesh.set_gl_state(depth_test=False, cull_face=False, blend=False)
         self.mesh.order = 0
         self.lines = scene.visuals.Line(connect="segments", width=1,
                                         parent=self.view.scene)
@@ -90,7 +114,7 @@ class GridMode(BaseMode):
         self.nodes.set_gl_state("translucent", depth_test=False)
         self.nodes.order = 2
         self.visuals = [self.mesh, self.lines, self.nodes]
-        self._alloc(int(self.settings.grid_cols))
+        self._alloc(int(getattr(self.settings, self.cols_attr)))
 
     # ------------------------------------------------------------ topology
 
@@ -126,12 +150,21 @@ class GridMode(BaseMode):
         # each column reads its own slice of the spectrum
         self.col_bin = np.minimum((np.arange(cols) * 64 // cols), 63)
 
+        # per-vertex colour buffers, filled in place each frame; at 96
+        # columns these are ~37k vertices and reallocating them per frame
+        # cost more than the noise did
+        self._line_rgba = np.ones((len(self.edges), 4), np.float32)
+        self._node_rgba = np.ones((n * n, 4), np.float32)
+        self._nm_cache = None
+        self._nm_edges = None
+
     # --------------------------------------------------------------- frame
 
     def update(self, frame, dt):
         s_set = self.settings
-        if int(s_set.grid_cols) != self._cols:
-            self._alloc(int(s_set.grid_cols))
+        want = int(getattr(s_set, self.cols_attr))
+        if want != self._cols:
+            self._alloc(want)
         cols, n = self._cols, self._cols + 1
 
         bands = frame.bands
@@ -158,7 +191,7 @@ class GridMode(BaseMode):
         wx, wy = self.gx * ns * WARP_SCALE, self.gy * ns * WARP_SCALE
         dx = perlin3(wx, wy, self._t, self.perm)
         dy = perlin3(wx + 31.7, wy + 11.3, self._t, self.perm)
-        amp = self.cell * WARP_CELLS * wa
+        amp = self.cell * self.warp_cells * wa
         nx = self.gx + dx * amp
         ny = self.gy + dy * amp
 
@@ -172,6 +205,9 @@ class GridMode(BaseMode):
         # its own frequency, so the grid doubles as an analyzer
         col = np.clip(frame.spectrum[self.col_bin], 0.0, 1.0)[None, :]
         s = s * swell * (0.72 + 0.55 * col)
+
+        # last, so an override is not undone by the swell or the spectrum
+        s = self.shape_scale(s, cols, swell)
 
         lo, hi = hiding_square(s)
         hidden = lo >= hi
@@ -212,11 +248,29 @@ class GridMode(BaseMode):
         node_xy = np.stack([nx.ravel() * self.extent,
                             ny.ravel() * self.extent,
                             np.zeros(n * n, np.float32)], 1).astype(np.float32)
-        self.lines.set_data(pos=node_xy[self.edges],
-                            color=(1.0, 1.0, 1.0, 0.10 + 0.22 * treble))
-        self.nodes.set_data(node_xy, edge_width=0,
-                            face_color=(1.0, 1.0, 1.0, 0.18 + 0.35 * treble),
-                            size=float(np.clip(1.0 + 2.4 * frame.rms, 1.0, 3.6)))
+        la = 0.10 + 0.22 * treble
+        na = 0.18 + 0.35 * treble
+        size = float(np.clip(1.0 + 2.4 * frame.rms, 1.0, 3.6))
+        nm = self.node_mask(n)
+        if nm is None:
+            self.lines.set_data(pos=node_xy[self.edges],
+                                color=(1.0, 1.0, 1.0, la))
+            self.nodes.set_data(node_xy, edge_width=0,
+                                face_color=(1.0, 1.0, 1.0, na), size=size)
+        else:
+            # the mask only changes when the word or the grid does, so the
+            # edge gather is cached on its identity
+            if nm is not self._nm_cache:
+                f = nm.ravel().astype(np.float32)
+                self._nm_cache = nm
+                self._nm_flat = f
+                self._nm_edges = f[self.edges]
+            self._line_rgba[:, 3] = la * self._nm_edges
+            self._node_rgba[:, 3] = na * self._nm_flat
+            self.lines.set_data(pos=node_xy[self.edges],
+                                color=self._line_rgba)
+            self.nodes.set_data(node_xy, edge_width=0,
+                                face_color=self._node_rgba, size=size)
 
     def velocity_magnitude(self):
         return self.swell.speed + self.warp_amt.speed
