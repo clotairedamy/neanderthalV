@@ -13,6 +13,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform
 
 from ..color.palette import extract_frame_palette
 from ..physics.velocity import VelocityValue
+from ..video.flashes import detect_flashes
 from ..video.player import VideoSource, chromakey_mask
 from .grain import GrainOverlay
 from .mode_icosphere import IcosphereMode
@@ -109,6 +110,13 @@ class VizManager:
         self._tick_id = 0
 
         self.video: VideoSource | None = None
+        # beat-cued video: flash onsets found in the clip, and the virtual
+        # playhead that jumps between them
+        self.flash_cues: list[dict] = []
+        self._cue_time: float | None = None
+        self._cue_i = -1
+        self._last_cue = -99.0
+        self._cue_drum_ema = 0.0
         self.camera = None                      # CameraSource when enabled
         self.still_image: np.ndarray | None = None   # last loaded photo (RGB)
         self.last_audio_time = 0.0
@@ -157,9 +165,72 @@ class VizManager:
         if self.video is not None:
             self.video.close()
         self.video = source
+        self.flash_cues = []
+        self._cue_time = None
+        self._cue_i = -1
         if source is None:
             self.bg_image.visible = False
             self.tex_image.visible = False
+            return
+        # scanning an 86s clip takes ~2s the first time and nothing after,
+        # so it runs off the UI thread and the cues appear when ready
+        import threading
+
+        def scan(path=source.path):
+            try:
+                cues = detect_flashes(path)
+            except Exception:
+                cues = []
+            if self.video is not None and self.video.path == path:
+                self.flash_cues = cues
+
+        threading.Thread(target=scan, daemon=True).start()
+
+    # ------------------------------------------------------- beat cueing
+
+    def _cue_hit(self, frame) -> float:
+        """How hard the drums just hit, 0..1.
+
+        Prefers the separated drums stem, which is what cutting "on the
+        drums" means; falls back to the low-band transient, which on a full
+        mix is mostly the kick anyway.
+        """
+        drums = frame.stem_energy.get("drums")
+        if drums is not None:
+            prev = self._cue_drum_ema
+            self._cue_drum_ema = 0.82 * prev + 0.18 * drums
+            return float(np.clip((drums - prev) * 3.5, 0.0, 1.0))
+        return float(np.clip(frame.punch, 0.0, 1.0))
+
+    def _video_time(self, audio_time: float, frame, dt: float) -> float:
+        """Which point in the clip to show.
+
+        Normally the audio playhead: the video is beat-matched to its own
+        soundtrack. With cueing on, the playhead instead jumps to a detected
+        flash the instant a drum lands, so the flash's first frame is the
+        one that appears on the beat, and then plays forward from there.
+        """
+        if not self.settings.video_beat_cue or not self.flash_cues:
+            self._cue_time = None
+            return audio_time
+        if self._cue_time is None:
+            # park on the first flash but leave the index before it, so the
+            # first drum hit cuts to flash 0 instead of skipping past it
+            self._cue_time = float(self.flash_cues[0]["t"])
+            self._cue_i = -1
+
+        hit = self._cue_hit(frame)
+        strong = hit > 0.35 or (frame.beat and frame.beat_strength > 0.55
+                                and hit > 0.12)
+        if strong and (audio_time - self._last_cue) >= self.settings.video_cue_gap:
+            # step through the flashes in order, so the storm progresses
+            # rather than stuttering on whichever one was picked at random
+            self._cue_i = (self._cue_i + 1) % len(self.flash_cues)
+            self._cue_time = float(self.flash_cues[self._cue_i]["t"])
+            self._last_cue = audio_time
+        else:
+            self._cue_time += dt
+        return self._cue_time
 
     def set_camera(self, source) -> None:
         if self.camera is not None:
@@ -296,7 +367,7 @@ class VizManager:
         else:
             self._applied_dist = None
 
-        self._update_video(audio_time, frame)
+        self._update_video(self._video_time(audio_time, frame, dt), frame)
         self.grain.update(frame, dt)
         self._update_fx(frame, dt)
 

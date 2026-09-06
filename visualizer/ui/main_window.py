@@ -254,6 +254,30 @@ class MainWindow(QMainWindow):
         self.chroma_check.toggled.connect(
             lambda on: setattr(self.settings, "chromakey", on))
         vl.addWidget(self.chroma_check)
+
+        self.cue_check = QCheckBox("Cut to flashes on the beat")
+        self.cue_check.setToolTip(
+            "Finds the flashes in the clip (lightning, strobes, cuts) and "
+            "jumps the video to one each time the drums hit, so the flash "
+            "lands on the beat. Uses the drums stem once it is separated.")
+        self.cue_check.setChecked(self.settings.video_beat_cue)
+        self.cue_check.toggled.connect(
+            lambda on: setattr(self.settings, "video_beat_cue", on))
+        vl.addWidget(self.cue_check)
+
+        crow3 = QHBoxLayout()
+        lbg = QLabel("Min cut gap")
+        lbg.setToolTip("Shortest time between cuts, in seconds")
+        crow3.addWidget(lbg)
+        self.cue_gap_spin = QDoubleSpinBox()
+        self.cue_gap_spin.setRange(0.05, 2.0)
+        self.cue_gap_spin.setSingleStep(0.05)
+        self.cue_gap_spin.setValue(self.settings.video_cue_gap)
+        self.cue_gap_spin.valueChanged.connect(
+            lambda v: setattr(self.settings, "video_cue_gap", v))
+        crow3.addWidget(self.cue_gap_spin)
+        vl.addLayout(crow3)
+
         self.video_thumb = QLabel()
         self.video_thumb.setFixedHeight(70)
         self.video_thumb.setStyleSheet("background:#111; border:1px solid #333;")
@@ -858,12 +882,30 @@ class MainWindow(QMainWindow):
             self.info_bar.status.setText(
                 f"{os.path.basename(path)} has no audio track — loaded as "
                 "visuals only; play a track or the mic to drive it")
+            self._report_cues(path)
             return
         self.engine.load_file(path, audio_override=audio)
         self._current_path = path
         self.file_label.setText(os.path.basename(path))
         self.play_btn.setText("▶ Play")
         self.info_bar.status.setText("Video loaded — beat-matched to its audio")
+        self._report_cues(path)
+
+    def _report_cues(self, path: str) -> None:
+        """Say how many flashes the scan found, once it finishes."""
+        from PyQt6.QtCore import QTimer
+
+        def check(tries=[0]):
+            tries[0] += 1
+            cues = self.viz.flash_cues
+            if cues:
+                self.info_bar.status.setText(
+                    f"{os.path.basename(path)}: {len(cues)} flashes found — "
+                    "tick “Cut to flashes on the beat” under Source")
+            elif tries[0] < 20:
+                QTimer.singleShot(400, check)
+
+        QTimer.singleShot(400, check)
 
     def _empty_pixmap(self):
         from PyQt6.QtGui import QPixmap
