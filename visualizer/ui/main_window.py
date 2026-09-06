@@ -486,6 +486,39 @@ class MainWindow(QMainWindow):
         self._cut_box = cut_box
         vis_l.addWidget(cut_box)
 
+        # -- storm (mode 13)
+        storm_box = QGroupBox("Storm  (mode 13)")
+        stl = QVBoxLayout(storm_box)
+        cap3 = QLabel("Lightning on the drums. Uses the separated drums stem "
+                      "when it is ready, the kick transient until then.")
+        cap3.setWordWrap(True)
+        cap3.setStyleSheet("color:#889;")
+        stl.addWidget(cap3)
+
+        def storm_spin(label, lo, hi, step, attr, tip=""):
+            r = QHBoxLayout()
+            lb4 = QLabel(label)
+            if tip:
+                lb4.setToolTip(tip)
+            r.addWidget(lb4)
+            sp = QDoubleSpinBox()
+            sp.setRange(lo, hi)
+            sp.setSingleStep(step)
+            sp.setValue(getattr(self.settings, attr))
+            sp.valueChanged.connect(lambda v, a=attr: setattr(self.settings, a, v))
+            r.addWidget(sp)
+            stl.addLayout(r)
+
+        storm_spin("Trigger", 0.0, 1.0, 0.05, "storm_sensitivity",
+                   "How easily a drum hit fires a bolt. Strikes are rate "
+                   "limited to about 3 per second regardless.")
+        storm_spin("Flash", 0.0, 1.0, 0.05, "storm_flash",
+                   "Strike brightness. Turn down if the flashing is too much.")
+        storm_spin("Drift", 0.0, 3.0, 0.1, "storm_drift",
+                   "How fast the cloud deck billows")
+        self._storm_box = storm_box
+        vis_l.addWidget(storm_box)
+
         # -- settings
         set_box = QGroupBox("Analysis && Motion")
         sl = QVBoxLayout(set_box)
@@ -815,11 +848,19 @@ class MainWindow(QMainWindow):
         if thumb is not None:
             self._show_thumb(thumb)
         audio = extract_audio_from_video(path)
-        self.engine.load_file(path, audio_override=audio)
-        self._current_path = path
         self.viz.set_video(source)
         if self.settings.video_display == "off":
             self.video_combo.setCurrentText("background")
+        if audio is None:
+            # silent footage: still a perfectly good visual layer, so keep
+            # whatever is already driving the visuals rather than refusing
+            # the file outright
+            self.info_bar.status.setText(
+                f"{os.path.basename(path)} has no audio track — loaded as "
+                "visuals only; play a track or the mic to drive it")
+            return
+        self.engine.load_file(path, audio_override=audio)
+        self._current_path = path
         self.file_label.setText(os.path.basename(path))
         self.play_btn.setText("▶ Play")
         self.info_bar.status.setText("Video loaded — beat-matched to its audio")
@@ -895,6 +936,7 @@ class MainWindow(QMainWindow):
         self._txt_box.setVisible(cur == 9)
         self._grid_box.setVisible(cur in (10, 11))
         self._cut_box.setVisible(cur == 11)
+        self._storm_box.setVisible(cur == 12)
         # two fields, one setting: keep whichever is about to be shown in
         # step with the other
         for w in (self.text_edit, self.cut_text_edit):

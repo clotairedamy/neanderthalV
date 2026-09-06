@@ -10,6 +10,7 @@ frame-accurate against whatever the user hears.
 from __future__ import annotations
 
 import os
+import re
 
 import numpy as np
 import sounddevice as sd
@@ -53,10 +54,36 @@ def load_audio_file(path: str, sr: int = SR) -> np.ndarray:
     return np.ascontiguousarray(data, dtype=np.float32)
 
 
-def extract_audio_from_video(video_path: str, sr: int = SR) -> np.ndarray:
-    """Extract the audio track of a video via ffmpeg -> (n, 2) float32."""
+def video_has_audio(video_path: str) -> bool:
+    """Whether the file carries an audio stream at all.
+
+    Plenty of footage does not -- stock clips, screen captures, phone
+    slow-motion, anything exported video-only. Asking ffmpeg to extract
+    audio from those produces an output file with no streams and a hard
+    error, which is not the same thing as the file being broken, so it is
+    worth knowing before trying.
+    """
+    import subprocess
+    try:
+        # no output file, so ffmpeg reports the streams and exits non-zero;
+        # the stream table is what we are after, not the status
+        out = subprocess.run([_ffmpeg_exe(), "-hide_banner", "-i", video_path],
+                             capture_output=True, text=True, timeout=30)
+    except Exception:
+        return True         # cannot tell: let the extraction try and report
+    return re.search(r"^\s*Stream #.*: Audio:", out.stderr, re.M) is not None
+
+
+def extract_audio_from_video(video_path: str, sr: int = SR) -> np.ndarray | None:
+    """Extract a video's audio track -> (n, 2) float32, or None if silent.
+
+    Returning None rather than raising keeps a silent video usable: it is
+    still perfectly good as a visual source, it just cannot drive anything.
+    """
     import subprocess
     import tempfile
+    if not video_has_audio(video_path):
+        return None
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     try:

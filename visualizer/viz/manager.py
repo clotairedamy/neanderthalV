@@ -27,11 +27,12 @@ from .mode_pointcloud import PointCloudMode
 from .mode_text import TextMode
 from .mode_grid import GridMode
 from .mode_cutout import GridCutoutMode
+from .mode_storm import StormMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
                 BlueprintMode, FiberMode, PointCloudMode, TextMode,
-                GridMode, GridCutoutMode]
+                GridMode, GridCutoutMode, StormMode]
 
 
 class VizManager:

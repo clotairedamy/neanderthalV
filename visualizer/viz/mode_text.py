@@ -402,7 +402,7 @@ class TessTextVisual(Visual):
         self.shared_program["u_energy"] = self._energy
         for k, v in (("u_explode", 0.0), ("u_scale", 1.0), ("u_yaw", 0.0),
                      ("u_pitch", 0.0), ("u_band_depth", 0.0),
-                     ("u_cell", 0.03),
+                     ("u_cell", 0.03), ("u_mono", 0.0),
                      ("u_light", (0.35, -0.75, 0.55))):
             self.shared_program[k] = v
         self._draw_mode = "triangles"
