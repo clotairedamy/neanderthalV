@@ -16,7 +16,8 @@ from ..physics.velocity import VelocityValue
 from ..video.flashes import detect_flashes
 
 
-def background_transform(w: int, h: int, mode: str):
+def background_transform(w: int, h: int, mode: str,
+                         canvas_aspect: float = 1.0):
     """Where to put a w x h video frame in the background view.
 
     The y scale is negative on purpose. A vispy Image lays row 0 at y = 0
@@ -24,10 +25,26 @@ def background_transform(w: int, h: int, mode: str):
     hangs the top of the frame along the bottom of the canvas -- which is
     to say every video played upside down. Flipping y and shifting the
     origin up by the height puts row 0 back at the top.
+
+    The view's camera maps the unit square onto the whole canvas, so unit
+    coordinates are not square on screen: filling that square stretches the
+    clip to the window's shape. `canvas_aspect` (width / height in pixels)
+    is what lets the frame keep its own proportions and letterbox instead.
     """
-    if mode == "pip":                     # bottom-right corner, 30% size
-        return (0.3 / w, -0.3 / h), (0.68, 0.32)
-    return (1.0 / w, -1.0 / h), (0.0, 1.0)
+    a = w / max(h, 1)
+    A = max(canvas_aspect, 1e-6)
+    if mode == "pip":
+        # a 30%-of-height box, made square on screen, with the clip fitted
+        # inside it
+        bh, bw = 0.3, 0.3 / A
+        u, v = (bw, bw * A / a) if a >= 1.0 else (bh * a / A, bh)
+        tx, ty = 0.97 - u, 0.03
+    else:
+        # letterbox into the unit square: a rect of unit size (u, v) renders
+        # with pixel aspect (u / v) * A, so u / v must be a / A
+        u, v = (1.0, A / a) if a >= A else (a / A, 1.0)
+        tx, ty = (1.0 - u) / 2.0, (1.0 - v) / 2.0
+    return (u / w, -v / h), (tx, ty + v)
 from ..video.player import VideoSource, chromakey_mask
 from .grain import GrainOverlay
 from .mode_icosphere import IcosphereMode
@@ -42,12 +59,12 @@ from .mode_pointcloud import PointCloudMode
 from .mode_text import TextMode
 from .mode_grid import GridMode
 from .mode_cutout import GridCutoutMode
-from .mode_storm import StormMode
+from .mode_footage import FootageMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
                 BlueprintMode, FiberMode, PointCloudMode, TextMode,
-                GridMode, GridCutoutMode, StormMode]
+                GridMode, GridCutoutMode, FootageMode]
 
 
 class VizManager:
@@ -293,7 +310,9 @@ class VizManager:
             self.bg_image.visible = True
             self.bg_image.set_data(img)
             h, w = frame.shape[:2]
-            scale, translate = background_transform(w, h, mode)
+            cw, ch = self.canvas.size
+            scale, translate = background_transform(w, h, mode,
+                                                    cw / max(ch, 1))
             self.bg_image.transform = STTransform(scale=scale,
                                                   translate=translate)
 

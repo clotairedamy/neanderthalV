@@ -130,10 +130,6 @@ class Settings:
     cutout_scale: float = 0.88    # share of the frame the word occupies
     cutout_invert: bool = False   # word solid instead of word void
 
-    # storm (mode 13)
-    storm_sensitivity: float = 0.65   # how easily a drum hit triggers a bolt
-    storm_flash: float = 1.0          # strike brightness
-    storm_drift: float = 1.0          # how fast the cloud deck billows
     bloom: bool = True              # GPU glow post-processing
     trails: bool = True             # feedback echo trails
     trail_amount: float = 1.0       # 0 = off-ish, 2 = heavy tunnel feedback

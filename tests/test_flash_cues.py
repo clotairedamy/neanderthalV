@@ -174,42 +174,62 @@ def test_it_falls_back_to_the_kick_when_stems_are_not_ready():
 from visualizer.viz.manager import background_transform
 
 
-def _corners(w, h, mode):
-    """Where the frame's top and bottom rows land on the canvas."""
-    (sx, sy), (tx, ty) = background_transform(w, h, mode)
-    return 0 * sy + ty, h * sy + ty          # (top row, bottom row)
+def _box(w, h, mode="background", aspect=1.0):
+    """Unit-space box the frame occupies: (width, height, top_y, bottom_y)."""
+    (sx, sy), (tx, ty) = background_transform(w, h, mode, aspect)
+    return w * sx, -h * sy, ty, ty + h * sy
 
 
 @pytest.mark.parametrize("mode", ["background", "pip"])
 def test_the_top_of_the_frame_lands_above_the_bottom(mode):
     """An Image lays row 0 at y = 0 and the background camera has y going
     up, so an unflipped transform plays every video upside down."""
-    top, bottom = _corners(874, 874, mode)
+    _, _, top, bottom = _box(874, 874, mode, 1.5)
     assert top > bottom
 
 
 @pytest.mark.parametrize("mode", ["background", "pip"])
 def test_the_frame_is_flipped_not_merely_offset(mode):
-    (sx, sy), _ = background_transform(640, 480, mode)
+    (sx, sy), _ = background_transform(640, 480, mode, 1.5)
     assert sy < 0 < sx
 
 
-def test_the_background_fills_the_unit_canvas():
-    top, bottom = _corners(1920, 1080, "background")
+@pytest.mark.parametrize("w,h", [(874, 874), (1920, 1080), (1080, 1920),
+                                 (640, 480), (2560, 1080)])
+@pytest.mark.parametrize("aspect", [0.6, 1.0, 1.5, 2.4])
+def test_the_clip_keeps_its_own_proportions(w, h, aspect):
+    """The camera maps the unit square to the whole canvas, so filling that
+    square stretches the clip to the window's shape."""
+    u, v, _, _ = _box(w, h, "background", aspect)
+    assert (u * aspect) / v == pytest.approx(w / h, rel=1e-9)
+
+
+@pytest.mark.parametrize("aspect", [0.6, 1.0, 1.5, 2.4])
+def test_the_letterboxed_clip_fits_and_is_centred(aspect):
+    u, v, top, bottom = _box(874, 874, "background", aspect)
+    assert u <= 1.0 + 1e-9 and v <= 1.0 + 1e-9
+    assert max(u, v) == pytest.approx(1.0)      # touches the frame
+    (_, _), (tx, _) = background_transform(874, 874, "background", aspect)
+    assert tx == pytest.approx((1.0 - u) / 2)   # centred horizontally
+    assert bottom == pytest.approx(1.0 - top)   # and vertically
+
+
+def test_a_matching_aspect_fills_the_canvas_exactly():
+    u, v, top, bottom = _box(1500, 1000, "background", 1.5)
+    assert (u, v) == pytest.approx((1.0, 1.0))
     assert (bottom, top) == pytest.approx((0.0, 1.0))
-    (sx, _), (tx, _) = background_transform(1920, 1080, "background")
-    assert tx == pytest.approx(0.0)
-    assert 1920 * sx == pytest.approx(1.0)
 
 
-def test_pip_sits_inside_the_canvas():
-    (sx, sy), (tx, ty) = background_transform(874, 874, "pip")
-    top, bottom = _corners(874, 874, "pip")
-    assert 0.0 <= bottom < top <= 1.0
-    assert 0.0 <= tx and tx + 874 * sx <= 1.0
+def test_pip_keeps_its_proportions_and_stays_on_canvas():
+    for aspect in (0.7, 1.5, 2.4):
+        u, v, top, bottom = _box(874, 874, "pip", aspect)
+        assert (u * aspect) / v == pytest.approx(1.0, rel=1e-9)
+        (_, _), (tx, _) = background_transform(874, 874, "pip", aspect)
+        assert 0.0 <= tx and tx + u <= 1.0
+        assert 0.0 <= bottom < top <= 1.0
 
 
 def test_orientation_holds_for_any_frame_size():
     for w, h in ((16, 9), (874, 874), (1080, 1920), (3840, 2160)):
-        top, bottom = _corners(w, h, "background")
+        _, _, top, bottom = _box(w, h, "background", 1.5)
         assert top > bottom
