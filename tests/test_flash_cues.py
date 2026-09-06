@@ -80,10 +80,11 @@ class _Stub:
     _video_time = VizManager._video_time
     _cue_hit = VizManager._cue_hit
 
-    def __init__(self, cues, gap=0.22, on=True):
+    def __init__(self, cues, gap=0.22, on=True, strength=0.45):
         class S:
             video_beat_cue = on
             video_cue_gap = gap
+            video_cue_strength = strength
         self.settings = S()
         self.flash_cues = cues
         self._cue_time = None
@@ -115,11 +116,67 @@ def test_a_clip_with_no_flashes_falls_back_to_the_playhead():
     assert m._video_time(7.5, _F(beat=True, punch=1.0), 1 / 60) == 7.5
 
 
-def test_a_drum_hit_jumps_the_video_to_a_flash():
+def test_a_beat_jumps_the_video_to_a_flash():
     m = _Stub(CUES)
     m._video_time(0.0, _F(), 1 / 60)              # settle
     t = m._video_time(1.0, _F(beat=True, punch=1.0, strength=0.9), 1 / 60)
     assert t in [c["t"] for c in CUES]
+
+
+def test_a_transient_off_the_beat_does_not_cut():
+    """The low-band 'punch' averages ~0.67 on real material and crosses any
+    useful threshold about twenty times a second. Triggering on it made the
+    cuts free-run at the rate limit instead of locking to the music."""
+    m = _Stub(CUES)
+    m._video_time(0.0, _F(), 1 / 60)
+    before = m._cue_time
+    after = m._video_time(1.0, _F(beat=False, punch=1.0), 1 / 60)
+    assert after == pytest.approx(before + 1 / 60, abs=1e-9)
+
+
+def test_a_weak_beat_does_not_cut():
+    m = _Stub(CUES, strength=0.6)
+    m._video_time(0.0, _F(), 1 / 60)
+    before = m._cue_time
+    after = m._video_time(1.0, _F(beat=True, strength=0.3), 1 / 60)
+    assert after == pytest.approx(before + 1 / 60, abs=1e-9)
+
+
+def test_the_strength_threshold_selects_how_many_beats_cut():
+    def cuts(threshold):
+        m = _Stub(CUES, gap=0.0, strength=threshold)
+        m._video_time(0.0, _F(), 1 / 60)
+        n = 0
+        for i, st in enumerate([0.2, 0.5, 0.9, 0.4, 0.7]):
+            before = m._cue_time
+            got = m._video_time(1.0 + i, _F(beat=True, strength=st), 1 / 60)
+            n += abs(got - (before + 1 / 60)) > 1e-9
+            m._cue_time = got
+        return n
+    assert cuts(0.0) == 5
+    assert cuts(0.45) == 3
+    assert cuts(0.8) == 1
+
+
+def test_a_loud_drum_can_carry_a_beat_the_detector_rated_weakly():
+    m = _Stub(CUES, strength=0.5)
+    m._video_time(0.0, _F(), 1 / 60)
+    f = _F(beat=True, strength=0.2)
+    f.stem_energy = {"drums": 0.95}
+    m._cue_drum_ema = 0.0
+    t = m._video_time(1.0, f, 1 / 60)
+    assert t in [c["t"] for c in CUES]
+
+
+def test_a_loud_drum_between_beats_still_does_not_cut():
+    """Drums select among beats; they never invent one."""
+    m = _Stub(CUES, strength=0.5)
+    m._video_time(0.0, _F(), 1 / 60)
+    f = _F(beat=False)
+    f.stem_energy = {"drums": 0.99}
+    m._cue_drum_ema = 0.0
+    before = m._cue_time
+    assert m._video_time(1.0, f, 1 / 60) == pytest.approx(before + 1 / 60, abs=1e-9)
 
 
 def test_between_hits_the_video_plays_forward_from_the_cue():

@@ -250,9 +250,19 @@ class VizManager:
             self._cue_time = float(self.flash_cues[0]["t"])
             self._cue_i = -1
 
-        hit = self._cue_hit(frame)
-        strong = hit > 0.35 or (frame.beat and frame.beat_strength > 0.55
-                                and hit > 0.12)
+        # Cut on beats, full stop. This used to fire on the low-band
+        # transient, which sounds right and is not: on real material that
+        # signal averages ~0.67 and crosses any useful threshold about
+        # twenty times a second, so the cuts free-ran at the rate limit
+        # rather than locking to the music. The beat flag -- and the offline
+        # beat grid behind it on file playback -- is the thing that knows
+        # where the beats are.
+        weight = frame.beat_strength
+        if frame.stem_energy.get("drums") is not None:
+            # with stems, a loud drum can carry a beat the detector rated
+            # weakly; it selects among beats, it never creates one
+            weight = max(weight, self._cue_hit(frame))
+        strong = frame.beat and weight >= self.settings.video_cue_strength
         if strong and (audio_time - self._last_cue) >= self.settings.video_cue_gap:
             # step through the flashes in order, so the storm progresses
             # rather than stuttering on whichever one was picked at random

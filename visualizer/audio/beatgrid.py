@@ -80,10 +80,23 @@ def compute_beat_grid(mono: np.ndarray, sr: int,
     beat tracking and punch scheduling far more precise."""
     import librosa
 
-    beat_src = drums if drums is not None and float(np.abs(drums).max()) > 1e-4 \
-        else mono
+    # Track the rhythm section, not the drum stem alone. The old test was
+    # "drums exist and aren't digital silence", which any separation
+    # artifact passes: on a bass-driven piece the drums stem carried 14% of
+    # the mix's energy, was mostly noise pulled out of the texture, and
+    # tracking it returned 120 BPM for a 69 BPM track. Drums plus bass is
+    # where the groove lives whichever of the two is carrying it.
+    rhythm = None
+    for stem in (drums, bass):
+        if stem is not None and float(np.abs(stem).max()) > 1e-4:
+            rhythm = stem if rhythm is None else rhythm + stem
+    beat_src = rhythm if rhythm is not None else mono
+    # aggregate=np.median is what librosa itself uses when beat_track builds
+    # its own envelope; onset_strength defaults to mean, which lets
+    # broadband noise -- storm rumble, room tone, tape hiss -- swamp the
+    # onsets. On the same track mean gave 148 BPM and median gives 69.
     env = librosa.onset.onset_strength(y=beat_src.astype(np.float32), sr=sr,
-                                       hop_length=HOP)
+                                       hop_length=HOP, aggregate=np.median)
     tempo, beat_frames = librosa.beat.beat_track(
         onset_envelope=env, sr=sr, hop_length=HOP)
     tempo = float(np.atleast_1d(tempo)[0])
@@ -117,7 +130,7 @@ def compute_beat_grid(mono: np.ndarray, sr: int,
     return BeatGrid(beats=beats, beat_strengths=np.asarray(bs),
                     onsets=onsets, onset_strengths=np.asarray(os_),
                     sections=sections, bpm=tempo,
-                    source="drums" if drums is not None else "mix")
+                    source="rhythm" if rhythm is not None else "mix")
 
 
 def _detect_sections(mono: np.ndarray, sr: int,

@@ -268,6 +268,20 @@ class MainWindow(QMainWindow):
             lambda on: setattr(self.settings, "video_beat_cue", on))
         vl.addWidget(self.cue_check)
 
+        srow2 = QHBoxLayout()
+        lbs2 = QLabel("Cut on beats over")
+        lbs2.setToolTip("Beat strength a beat needs to trigger a cut. "
+                        "Lower cuts on more beats.")
+        srow2.addWidget(lbs2)
+        self.cue_str_spin = QDoubleSpinBox()
+        self.cue_str_spin.setRange(0.0, 1.0)
+        self.cue_str_spin.setSingleStep(0.05)
+        self.cue_str_spin.setValue(self.settings.video_cue_strength)
+        self.cue_str_spin.valueChanged.connect(
+            lambda v: setattr(self.settings, "video_cue_strength", v))
+        srow2.addWidget(self.cue_str_spin)
+        vl.addLayout(srow2)
+
         crow3 = QHBoxLayout()
         lbg = QLabel("Min cut gap")
         lbg.setToolTip("Shortest time between cuts, in seconds")

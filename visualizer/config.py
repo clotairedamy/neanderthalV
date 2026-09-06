@@ -97,6 +97,7 @@ class Settings:
     chromakey: bool = False
     video_beat_cue: bool = True    # jump the clip to its flashes on the beat
     video_cue_gap: float = 0.22    # min seconds between cuts
+    video_cue_strength: float = 0.45  # beat strength needed to cut
     show_velocity_debug: bool = False
     auto_camera: bool = True
     last_dir: str = ""
