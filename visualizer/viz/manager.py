@@ -14,6 +14,20 @@ from vispy.visuals.transforms import STTransform, MatrixTransform
 from ..color.palette import extract_frame_palette
 from ..physics.velocity import VelocityValue
 from ..video.flashes import detect_flashes
+
+
+def background_transform(w: int, h: int, mode: str):
+    """Where to put a w x h video frame in the background view.
+
+    The y scale is negative on purpose. A vispy Image lays row 0 at y = 0
+    and the background camera has y increasing upward, so a positive scale
+    hangs the top of the frame along the bottom of the canvas -- which is
+    to say every video played upside down. Flipping y and shifting the
+    origin up by the height puts row 0 back at the top.
+    """
+    if mode == "pip":                     # bottom-right corner, 30% size
+        return (0.3 / w, -0.3 / h), (0.68, 0.32)
+    return (1.0 / w, -1.0 / h), (0.0, 1.0)
 from ..video.player import VideoSource, chromakey_mask
 from .grain import GrainOverlay
 from .mode_icosphere import IcosphereMode
@@ -270,8 +284,8 @@ class VizManager:
             s = 3.0 / max(h, w)
             self._tex_angle += 0.01 + frame_analysis.rms * 0.05
             tr = MatrixTransform()
-            tr.scale((s, s, 1))
-            tr.translate((-w * s / 2, -h * s / 2, 0))
+            tr.scale((s, -s, 1))          # flip: row 0 is the top of the frame
+            tr.translate((-w * s / 2, h * s / 2, 0))
             tr.rotate(np.degrees(self._tex_angle), (0, 1, 0))
             self.tex_image.transform = tr
         else:
@@ -279,13 +293,9 @@ class VizManager:
             self.bg_image.visible = True
             self.bg_image.set_data(img)
             h, w = frame.shape[:2]
-            if mode == "pip":
-                # bottom-right quarter of the canvas
-                self.bg_image.transform = STTransform(
-                    scale=(0.3 / w, 0.3 / h), translate=(0.68, 0.02))
-            else:  # full background
-                self.bg_image.transform = STTransform(
-                    scale=(1.0 / w, 1.0 / h), translate=(0, 0))
+            scale, translate = background_transform(w, h, mode)
+            self.bg_image.transform = STTransform(scale=scale,
+                                                  translate=translate)
 
     # ---------------------------------------------------------------- frame
 

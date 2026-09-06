@@ -32,6 +32,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings
         self.profile = active_profile()
+        # a silent clip kept as a visual layer, so loading a track to drive
+        # it does not throw it away
+        self._visual_video: str | None = None
         self.setWindowTitle("NeanderthalV — Audio-Reactive 3D Visualizer")
         self.resize(1280, 800)
         self.setAcceptDrops(True)
@@ -841,9 +844,13 @@ class MainWindow(QMainWindow):
 
     def _load_audio(self, path: str):
         self.mic_btn.setChecked(False)
-        self.viz.set_video(None)
-        self.video_thumb.setText("no video")
-        self.video_thumb.setPixmap(self._empty_pixmap())
+        # A silent video is a visual layer, not a source of sound. Clearing
+        # it here meant the only way to give it a clock -- loading a track --
+        # was also the thing that threw it away.
+        if self._visual_video is None:
+            self.viz.set_video(None)
+            self.video_thumb.setText("no video")
+            self.video_thumb.setPixmap(self._empty_pixmap())
         self.engine.load_file(path)
         self._current_path = path
         self.file_label.setText(os.path.basename(path))
@@ -879,11 +886,13 @@ class MainWindow(QMainWindow):
             # silent footage: still a perfectly good visual layer, so keep
             # whatever is already driving the visuals rather than refusing
             # the file outright
+            self._visual_video = path
             self.info_bar.status.setText(
                 f"{os.path.basename(path)} has no audio track — loaded as "
                 "visuals only; play a track or the mic to drive it")
             self._report_cues(path)
             return
+        self._visual_video = None
         self.engine.load_file(path, audio_override=audio)
         self._current_path = path
         self.file_label.setText(os.path.basename(path))

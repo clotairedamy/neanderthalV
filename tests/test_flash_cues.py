@@ -167,3 +167,49 @@ def test_the_drums_stem_is_preferred_over_the_kick_transient():
 def test_it_falls_back_to_the_kick_when_stems_are_not_ready():
     m = _Stub(CUES)
     assert m._cue_hit(_F(punch=0.8)) == pytest.approx(0.8)
+
+
+# --------------------------------------------------- video orientation
+
+from visualizer.viz.manager import background_transform
+
+
+def _corners(w, h, mode):
+    """Where the frame's top and bottom rows land on the canvas."""
+    (sx, sy), (tx, ty) = background_transform(w, h, mode)
+    return 0 * sy + ty, h * sy + ty          # (top row, bottom row)
+
+
+@pytest.mark.parametrize("mode", ["background", "pip"])
+def test_the_top_of_the_frame_lands_above_the_bottom(mode):
+    """An Image lays row 0 at y = 0 and the background camera has y going
+    up, so an unflipped transform plays every video upside down."""
+    top, bottom = _corners(874, 874, mode)
+    assert top > bottom
+
+
+@pytest.mark.parametrize("mode", ["background", "pip"])
+def test_the_frame_is_flipped_not_merely_offset(mode):
+    (sx, sy), _ = background_transform(640, 480, mode)
+    assert sy < 0 < sx
+
+
+def test_the_background_fills_the_unit_canvas():
+    top, bottom = _corners(1920, 1080, "background")
+    assert (bottom, top) == pytest.approx((0.0, 1.0))
+    (sx, _), (tx, _) = background_transform(1920, 1080, "background")
+    assert tx == pytest.approx(0.0)
+    assert 1920 * sx == pytest.approx(1.0)
+
+
+def test_pip_sits_inside_the_canvas():
+    (sx, sy), (tx, ty) = background_transform(874, 874, "pip")
+    top, bottom = _corners(874, 874, "pip")
+    assert 0.0 <= bottom < top <= 1.0
+    assert 0.0 <= tx and tx + 874 * sx <= 1.0
+
+
+def test_orientation_holds_for_any_frame_size():
+    for w, h in ((16, 9), (874, 874), (1080, 1920), (3840, 2160)):
+        top, bottom = _corners(w, h, "background")
+        assert top > bottom
