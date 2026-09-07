@@ -12,6 +12,8 @@ class BaseMode:
     consumes_video = False    # True: mode renders the video itself (no backdrop)
     trail_scale = 1.0         # per-mode feedback-trail multiplier
     bloom_scale = 1.0         # per-mode glow multiplier (0 = crisp)
+    auto_orbit = True         # False: the auto-camera must not orbit this
+                              # mode (flat, front-facing work goes edge-on)
 
     def __init__(self, view, palette, settings, profile):
         self.view = view

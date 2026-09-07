@@ -60,11 +60,12 @@ from .mode_text import TextMode
 from .mode_grid import GridMode
 from .mode_cutout import GridCutoutMode
 from .mode_footage import FootageMode
+from .mode_kva import KvaRingMode
 
 MODE_CLASSES = [IcosphereMode, PolyhedraMode, ParticlesMode,
                 FractalMode, TopologyMode, KaleidoscopeMode,
                 BlueprintMode, FiberMode, PointCloudMode, TextMode,
-                GridMode, GridCutoutMode, FootageMode]
+                GridMode, GridCutoutMode, KvaRingMode, FootageMode]
 
 
 class VizManager:
@@ -271,6 +272,9 @@ class VizManager:
             self._last_cue = audio_time
         else:
             self._cue_time += dt
+        # keep it inside the clip so it never runs off the end
+        if self.video is not None and self.video.duration > 0:
+            self._cue_time %= self.video.duration
         return self._cue_time
 
     def set_camera(self, source) -> None:
@@ -380,7 +384,10 @@ class VizManager:
         self.velocity_magnitude = mode.velocity_magnitude()
 
         # auto camera rotation with velocity smoothing
-        if (self.settings.auto_camera
+        # mode.auto_orbit: a flat, front-facing piece -- type especially --
+        # turns edge-on and becomes a vertical smear once the azimuth comes
+        # round, so those modes carry their own bounded sway instead
+        if (self.settings.auto_camera and mode.auto_orbit
                 and isinstance(self.view.camera, scene.cameras.TurntableCamera)):
             self._cam_spin.set_target(0.1 + frame.rms * 0.6)
             if frame.beat:

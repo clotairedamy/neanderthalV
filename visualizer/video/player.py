@@ -86,7 +86,15 @@ class VideoSource:
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
     def frame_at(self, t: float) -> np.ndarray | None:
-        """RGB frame for audio time t. Steps or seeks as needed; caches."""
+        """RGB frame for audio time t. Steps or seeks as needed; caches.
+
+        Time wraps: a clip used as a visual layer routinely outlives itself
+        because the track is longer, and clamping to the last frame reads
+        as the video having frozen.
+        """
+        dur = self.duration
+        if dur > 0:
+            t = t % dur
         target = int(np.clip(t * self.fps, 0, max(0, self.n_frames - 1)))
         if target == self._frame_idx and self._frame is not None:
             return self._frame
@@ -99,6 +107,12 @@ class VideoSource:
         ok, bgr = False, None
         for _ in range(min(gap, int(self.fps) + 1)):  # bounded catch-up
             ok, bgr = self.cap.read()
+            if not ok:
+                # a failed read used to still advance the counter, so the
+                # index went on lying about where the decoder actually was
+                # and every later step compounded it. Force a seek instead.
+                self._frame_idx = -1
+                break
             self._frame_idx += 1
         if ok and bgr is not None:
             self._frame = self._to_rgb(bgr)

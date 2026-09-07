@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
 
         try:
             self._mode_prefs = json.loads(settings.mode_prefs or "{}")
+            self._mode_prefs = self._migrate_mode_prefs(self._mode_prefs)
         except ValueError:
             self._mode_prefs = {}
         self._queue: list[str] = []
@@ -132,6 +133,8 @@ class MainWindow(QMainWindow):
         tr.setContentsMargins(12, 8, 12, 8)
         tr.setSpacing(10)
         self.play_btn = QPushButton("▶")
+        # icon only: the button is 44px wide and "⏸ Pause" does not fit,
+        # so the label was being clipped to a sliver
         self.play_btn.setFixedWidth(44)
         self.play_btn.setToolTip("Play / pause  (Space)")
         self.play_btn.clicked.connect(self._toggle_play)
@@ -527,6 +530,65 @@ class MainWindow(QMainWindow):
         self._cut_box = cut_box
         vis_l.addWidget(cut_box)
 
+        # -- KVA ring (mode 14)
+        kva_box = QGroupBox("KVA Ring  (mode 14)")
+        kl = QVBoxLayout(kva_box)
+        cap4 = QLabel("The logo artwork with a reactive polar ring. Pick "
+                      "which part of the spectrum drives the dots.")
+        cap4.setWordWrap(True)
+        cap4.setStyleSheet("color:#889;")
+        kl.addWidget(cap4)
+
+        brow = QHBoxLayout()
+        lbb = QLabel("Band")
+        lbb.setToolTip("Which frequencies the ring reacts to. The logo "
+                       "always pulses on the low end.")
+        brow.addWidget(lbb)
+        self.kva_band_combo = QComboBox()
+        self.kva_band_combo.addItems(["all", "lows", "mids", "highs"])
+        self.kva_band_combo.setCurrentText(self.settings.kva_band)
+        self.kva_band_combo.currentTextChanged.connect(
+            lambda v: setattr(self.settings, "kva_band", v))
+        brow.addWidget(self.kva_band_combo)
+        kl.addLayout(brow)
+
+        def kva_int(label, lo, hi, attr, tip=""):
+            r = QHBoxLayout()
+            lb5 = QLabel(label)
+            if tip:
+                lb5.setToolTip(tip)
+            r.addWidget(lb5)
+            sp = QSpinBox()
+            sp.setRange(lo, hi)
+            sp.setValue(int(getattr(self.settings, attr)))
+            sp.valueChanged.connect(
+                lambda v, a=attr: setattr(self.settings, a, int(v)))
+            r.addWidget(sp)
+            kl.addLayout(r)
+
+        def kva_spin(label, lo, hi, step, attr, tip=""):
+            r = QHBoxLayout()
+            lb6 = QLabel(label)
+            if tip:
+                lb6.setToolTip(tip)
+            r.addWidget(lb6)
+            sp = QDoubleSpinBox()
+            sp.setRange(lo, hi)
+            sp.setSingleStep(step)
+            sp.setValue(getattr(self.settings, attr))
+            sp.valueChanged.connect(lambda v, a=attr: setattr(self.settings, a, v))
+            r.addWidget(sp)
+            kl.addLayout(r)
+
+        kva_int("Sectors", 24, 360, "kva_sectors", "Dots around the ring")
+        kva_int("Rings", 2, 12, "kva_rings", "Dots across the band")
+        kva_spin("Reach", 0.0, 3.0, 0.1, "kva_reach",
+                 "How far the sound pushes the ring outward")
+        kva_spin("Dot size", 0.0, 3.0, 0.1, "kva_dot", "Dot size response")
+        kva_spin("Spin", 0.0, 3.0, 0.1, "kva_spin", "Rotation rate")
+        self._kva_box = kva_box
+        vis_l.addWidget(kva_box)
+
         # -- settings
         set_box = QGroupBox("Analysis && Motion")
         sl = QVBoxLayout(set_box)
@@ -716,7 +778,8 @@ class MainWindow(QMainWindow):
         if len(MODE_CLASSES) >= 10:
             sc("0", lambda: self._select_mode(9))     # mode 10
         # the digits run out at ten, so mode 11 onward take the keys beside them
-        for j, key in enumerate(("-", "=")):
+        # 1-0 cover the first ten; these continue the run past them
+        for j, key in enumerate(("-", "=", "[", "]")):
             if len(MODE_CLASSES) > 10 + j:
                 sc(key, lambda k=10 + j: self._select_mode(k))
         # stem toggles: V/D/B/O
@@ -835,7 +898,7 @@ class MainWindow(QMainWindow):
         self.engine.load_file(path)
         self._current_path = path
         self.file_label.setText(os.path.basename(path))
-        self.play_btn.setText("▶ Play")
+        self.play_btn.setText("▶")
 
     def _load_image(self, path: str):
         colors = self.palette_mgr.set_image(path)
@@ -877,7 +940,7 @@ class MainWindow(QMainWindow):
         self.engine.load_file(path, audio_override=audio)
         self._current_path = path
         self.file_label.setText(os.path.basename(path))
-        self.play_btn.setText("▶ Play")
+        self.play_btn.setText("▶")
         self.info_bar.status.setText("Video loaded — beat-matched to its audio")
         self._report_cues(path)
 
@@ -913,7 +976,7 @@ class MainWindow(QMainWindow):
 
     def _toggle_play(self):
         self.engine.toggle()
-        self.play_btn.setText("⏸ Pause" if self.engine.playing else "▶ Play")
+        self.play_btn.setText("⏸" if self.engine.playing else "▶")
 
     def _toggle_mic(self, on: bool):
         self.engine.set_mic_enabled(on)
@@ -968,6 +1031,7 @@ class MainWindow(QMainWindow):
         self._txt_box.setVisible(cur == 9)
         self._grid_box.setVisible(cur in (10, 11))
         self._cut_box.setVisible(cur == 11)
+        self._kva_box.setVisible(cur == 12)
         # two fields, one setting: keep whichever is about to be shown in
         # step with the other
         for w in (self.text_edit, self.cut_text_edit):
@@ -976,13 +1040,44 @@ class MainWindow(QMainWindow):
                 w.setText(self.settings.text_content)
                 w.blockSignals(False)
 
+    # indices 0-9 have named the same visualizations for the life of the
+    # index-keyed format; anything above that has been reshuffled by
+    # insertions, so its saved preference is already pointing at the wrong
+    # mode and is dropped rather than migrated onto another wrong one
+    _STABLE_PREF_INDICES = 10
+
+    def _migrate_mode_prefs(self, prefs: dict) -> dict:
+        out = {}
+        for key, val in prefs.items():
+            if not key.isdigit():
+                out[key] = val                     # already a mode name
+                continue
+            i = int(key)
+            if i < self._STABLE_PREF_INDICES and i < len(self.viz.modes):
+                out[self.viz.modes[i].name] = val
+        return out
+
+    def _mode_key(self, k: int) -> str:
+        """Remember per-mode preferences under the mode's name.
+
+        These used to be keyed by list index, so inserting a mode silently
+        handed every later mode someone else's saved palette and grain --
+        a new visualization would come up wearing scanlines because the
+        slot it landed in used to be something else.
+        """
+        try:
+            return self.viz.modes[k].name
+        except (IndexError, AttributeError):
+            return str(k)
+
     def _mode_changed(self, k: int):
         old = self.viz.current
-        self._mode_prefs[str(old)] = {"palette": self.settings.palette,
-                                      "grain": self.settings.grain_mode}
+        self._mode_prefs[self._mode_key(old)] = {
+            "palette": self.settings.palette,
+            "grain": self.settings.grain_mode}
         self.viz.set_mode(k)
         self._update_mode_panels()
-        prefs = self._mode_prefs.get(str(k))
+        prefs = self._mode_prefs.get(self._mode_key(k))
         if prefs:
             self.palette_combo.setCurrentText(prefs["palette"])
             self.grain_combo.setCurrentText(prefs["grain"])
@@ -1056,7 +1151,7 @@ class MainWindow(QMainWindow):
     # -- playlist
 
     def _on_playback_finished(self):
-        self.play_btn.setText("▶ Play")
+        self.play_btn.setText("▶")
         if self._queue and not self.engine.loop:
             QTimer.singleShot(100, self._advance_queue)
 
@@ -1068,7 +1163,7 @@ class MainWindow(QMainWindow):
         self.queue_list.setVisible(bool(self._queue))
         self._load_path(path)
         QTimer.singleShot(400, self.engine.play)
-        self.play_btn.setText("⏸ Pause")
+        self.play_btn.setText("⏸")
 
     def _play_queued(self, item):
         row = self.queue_list.row(item)

@@ -50,6 +50,7 @@ uniform float u_scale;
 uniform float u_yaw;
 uniform float u_pitch;
 uniform float u_band_depth;
+uniform float u_e_mean;
 uniform float u_cell;
 uniform vec3 u_light;
 uniform float u_mono;
@@ -77,8 +78,12 @@ void main() {
         p = a_centroid + local + a_seed * amt * u_cell * 5.0;
     }
 
-    // depth axis is Y: vispy's turntable camera is Z-up
-    p.y += e * u_band_depth;
+    // Depth axis is Y (the turntable camera is Z-up). Displace about the
+    // mean, not from zero: a raw push moves the whole word backwards as
+    // well as deforming it, and the yaw shears that into sideways travel
+    // until the letters leave the frame. Clamped for the same reason --
+    // the word is only ~1.7 tall, so an unbounded push loses it.
+    p.y += clamp((e - u_e_mean) * u_band_depth, -0.7, 0.7);
     p *= u_scale;
 
     float cy = cos(u_yaw), sy = sin(u_yaw);
@@ -116,6 +121,7 @@ uniform float u_scale;
 uniform float u_yaw;
 uniform float u_pitch;
 uniform float u_band_depth;
+uniform float u_e_mean;
 uniform float u_size;
 uniform float u_mono;
 uniform sampler2D u_lut;
@@ -131,7 +137,7 @@ void main() {
     // do is drift -- and it has to be a small drift, or a kick throws the
     // word into a ball instead of roughing up its edges
     vec3 p = a_pos + a_seed * u_explode * 0.10;
-    p.y += e * u_band_depth;
+    p.y += clamp((e - u_e_mean) * u_band_depth, -0.7, 0.7);
     p *= u_scale;
 
     float cy = cos(u_yaw), sy = sin(u_yaw);
@@ -146,7 +152,9 @@ void main() {
 
     vec3 base = texture2DLod(u_lut, vec2(a_u, 0.5), 0.0).rgb;
     base = mix(base, vec3(0.62 + 0.38 * a_edge), u_mono);
-    float b = (0.22 + 0.95 * a_edge) * (0.55 + 0.80 * e);
+    // a sprite covers area ~size^2, so brightness has to come down as the
+    // size goes up or a big point size turns the word into a white slab
+    float b = (0.22 + 0.95 * a_edge) * (0.55 + 0.80 * e) * (2.4 / u_size);
     v_color = vec4(base * b, 1.0);
 }
 """
@@ -352,7 +360,7 @@ class PointTextVisual(Visual):
         self.shared_program["u_energy"] = self._energy
         for k, v in (("u_explode", 0.0), ("u_scale", 1.0), ("u_yaw", 0.0),
                      ("u_pitch", 0.0), ("u_band_depth", 0.0),
-                     ("u_size", 3.4), ("u_mono", 0.0)):
+                     ("u_size", 3.4), ("u_mono", 0.0), ("u_e_mean", 0.0)):
             self.shared_program[k] = v
         self._draw_mode = "points"
         # additive, no depth write: the cloud should accumulate into glow
@@ -402,7 +410,7 @@ class TessTextVisual(Visual):
         self.shared_program["u_energy"] = self._energy
         for k, v in (("u_explode", 0.0), ("u_scale", 1.0), ("u_yaw", 0.0),
                      ("u_pitch", 0.0), ("u_band_depth", 0.0),
-                     ("u_cell", 0.03), ("u_mono", 0.0),
+                     ("u_cell", 0.03), ("u_mono", 0.0), ("u_e_mean", 0.0),
                      ("u_light", (0.35, -0.75, 0.55))):
             self.shared_program[k] = v
         self._draw_mode = "triangles"
@@ -444,9 +452,13 @@ PointText = create_visual_node(PointTextVisual)
 
 class TextMode(BaseMode):
     name = "Reactive 3D Text"
-    camera_distance = 3.4
+    camera_distance = 4.1   # room for the sway and the beat pulse
     camera_elevation = 8.0
     trail_scale = 0.35          # heavy trails smear type illegible
+    # the word is a flat plane; letting the global camera orbit it turns it
+    # edge-on twice a revolution, which is most of why it was unreadable.
+    # The mode's own yaw sway is bounded precisely to avoid that.
+    auto_orbit = False
 
     def build(self):
         self.tess = TessText(parent=self.view.scene)
@@ -454,6 +466,7 @@ class TextMode(BaseMode):
         self.visuals = [self.tess, self.points]
         self._text = None
         self._style = None
+        self._built_budget = 0
         self.n_cells = 0
         self._rebuild(self.settings.text_content,
                       bool(self.settings.text_points))
@@ -470,10 +483,22 @@ class TextMode(BaseMode):
         """Whichever style is currently showing."""
         return self.points if self._style else self.tess
 
+    # a sprite covers area ~size^2, so the count that fills the word at the
+    # reference size overdraws catastrophically at a larger one: 90k points
+    # at size 8 is not a word, it is a solid slab. Hold coverage roughly
+    # constant instead and let the user's size choice pick the density.
+    REF_POINTS, REF_SIZE = 90000, 2.4
+
+    def _point_budget(self) -> int:
+        size = max(float(self.settings.text_point_size), 0.5)
+        return int(np.clip(self.REF_POINTS * (self.REF_SIZE / size) ** 2,
+                           4000, 120000))
+
     def _rebuild(self, text: str, as_points: bool) -> None:
         mask = text_mask(text)
         if as_points:
-            pos, seed, u, edge = point_cloud(mask)
+            n = self._point_budget()
+            pos, seed, u, edge = point_cloud(mask, n_points=n)
             self.points.set_geometry(pos, seed, u, edge)
             self.n_cells = len(pos)
         else:
@@ -487,10 +512,17 @@ class TextMode(BaseMode):
         self.points.visible = as_points
         self._text = text
         self._style = as_points
+        self._built_budget = self._point_budget() if as_points else 0
 
     def update(self, frame, dt):
         want_points = bool(self.settings.text_points)
-        if self.settings.text_content != self._text or want_points != self._style:
+        # a big change in point size changes the budget, so rebuild for it
+        # too -- but not for every nudge of the spinbox
+        stale = (want_points and self._style
+                 and abs(self._point_budget() - self._built_budget)
+                 > 0.25 * max(self._built_budget, 1))
+        if (self.settings.text_content != self._text
+                or want_points != self._style or stale):
             self._rebuild(self.settings.text_content, want_points)
         dt = min(dt, 0.05)
         d = self.settings.damping
@@ -517,7 +549,9 @@ class TextMode(BaseMode):
         u = self.visual.set_uniform
         u("u_yaw", float(np.sin(self.sway_phase) * amp))
         u("u_pitch", float(np.sin(self.sway_phase * 0.53 + 1.1) * amp * 0.16))
-        u("u_scale", float(max(0.2, self.pulse.update(dt))))
+        # the word is ~2.9 wide against ~3.9 of visible width, so the pulse
+        # has little headroom before the outer letters leave the frame
+        u("u_scale", float(np.clip(self.pulse.update(dt), 0.4, 1.28)))
         u("u_explode", float(np.clip(self.explode.update(dt), 0.0, 2.5)))
         u("u_band_depth", float(self.settings.text_depth))
         u("u_mono", 1.0 if self.settings.text_mono else 0.0)
@@ -528,6 +562,7 @@ class TextMode(BaseMode):
         bands = np.clip(frame.bands, 0, 1)
         ramp = np.interp(np.linspace(0, 6, 64), np.arange(7), bands)
         self.visual.set_energy(ramp.astype(np.float32))
+        u("u_e_mean", float(ramp.mean()))
         self.visual.set_lut(self.palette.lut(256))
 
     def velocity_magnitude(self):

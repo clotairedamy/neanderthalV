@@ -131,6 +131,14 @@ class Settings:
     cutout_scale: float = 0.88    # share of the frame the word occupies
     cutout_invert: bool = False   # word solid instead of word void
 
+    # KVA ring (mode 14)
+    kva_band: str = "all"         # all | lows | mids | highs
+    kva_sectors: int = 180        # dots around the ring
+    kva_rings: int = 5            # dots across the annulus
+    kva_reach: float = 1.0        # how far the band pushes the ring out
+    kva_dot: float = 1.0          # dot size response
+    kva_spin: float = 1.0         # rotation rate
+
     bloom: bool = True              # GPU glow post-processing
     trails: bool = True             # feedback echo trails
     trail_amount: float = 1.0       # 0 = off-ish, 2 = heavy tunnel feedback

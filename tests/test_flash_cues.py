@@ -86,6 +86,7 @@ class _Stub:
             video_cue_gap = gap
             video_cue_strength = strength
         self.settings = S()
+        self.video = None          # no clip: nothing to wrap the cue time to
         self.flash_cues = cues
         self._cue_time = None
         self._cue_i = -1
@@ -290,3 +291,17 @@ def test_orientation_holds_for_any_frame_size():
     for w, h in ((16, 9), (874, 874), (1080, 1920), (3840, 2160)):
         _, _, top, bottom = _box(w, h, "background", 1.5)
         assert top > bottom
+
+
+def test_the_cue_time_wraps_inside_the_clip():
+    """A clip used as a visual layer outlives itself whenever the track is
+    longer; letting the cue time run past the end pinned it to the last
+    frame, which reads as the video freezing."""
+    class _Clip:
+        duration = 10.0
+    m = _Stub(CUES)
+    m.video = _Clip()
+    m._video_time(0.0, _F(), 1 / 60)
+    m._cue_time = 9.999
+    t = m._video_time(1.0, _F(), 1 / 60)
+    assert 0.0 <= t < 10.0

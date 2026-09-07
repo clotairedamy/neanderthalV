@@ -10,7 +10,9 @@ hiddenimports = (
        "scipy._cyutility", "PIL.Image"]
 )
 datas = (collect_data_files("vispy") + collect_data_files("librosa")
-         + [("../assets/kinect.mp4", "assets")])
+         + [("../assets/kinect.mp4", "assets"),
+            # the KVA ring mode rasterizes this at runtime
+            ("../assets/kva.svg", "assets")])
 
 try:
     import demucs  # noqa: F401
